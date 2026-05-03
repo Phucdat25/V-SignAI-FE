@@ -2,6 +2,17 @@ import { createBrowserRouter } from "react-router";
 import { Root } from "./Root";
 import { Landing } from "./pages/Landing";
 import { Login } from "./pages/Login";
+async function handleResponse(response: Response) {
+  const text = await response.text();
+
+  if (!response.ok) {
+    console.error(`Error: ${response.status}`, text);  // ← Thêm logging
+    const errorMessage = text || response.statusText || "Lỗi kết nối API";
+    throw new Error(errorMessage);
+  }
+
+  return text;
+}import { Register } from "./pages/Register";
 import { Dashboard } from "./pages/Dashboard";
 import { Conversation } from "./pages/Conversation";
 import { SignLibrary } from "./pages/SignLibrary";
@@ -24,6 +35,7 @@ export const router = createBrowserRouter([
     children: [
       { index: true, Component: Landing },
       { path: "login", Component: Login },
+      { path: "register", Component: Register },
       { path: "dashboard", Component: Dashboard },
       { path: "conversation", Component: Conversation },
       { path: "signs", Component: SignLibrary },
