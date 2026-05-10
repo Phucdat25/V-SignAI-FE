@@ -1,9 +1,23 @@
 import { useNavigate } from "react-router";
+import { useEffect, useState } from "react";
 import { Navbar } from "../components/Navbar";
 import { MessageSquare, BookOpen, History, Zap, Mic, TrendingUp, Bell } from "lucide-react";
+import { getUserInfo } from "../api";
 
 export function Dashboard() {
   const navigate = useNavigate();
+  const [userName, setUserName] = useState("");
+
+  useEffect(() => {
+    const user = getUserInfo();
+    console.log("Dashboard - User Info:", user);
+    if (user) {
+      console.log("Dashboard - User Name:", user.name);
+      setUserName(user.name || "User");
+    } else {
+      console.warn("Dashboard - No user info found in localStorage");
+    }
+  }, []);
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: "#f8fafc" }}>
@@ -12,16 +26,7 @@ export function Dashboard() {
         {/* Chào */}
         <div className="flex items-center justify-between mb-8">
           <div>
-            <p style={{ color: "#6B7280", fontSize: 14 }}>Chào buổi sáng 👋</p>
-            <h1 style={{ fontSize: 28, fontWeight: 800, color: "#1F2937" }}>Xin chào, Users!</h1>
-          </div>
-          <div className="flex items-center gap-3">
-            <button className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: "white", border: "1px solid #e5e7eb" }}>
-              <Bell size={18} color="#6B7280" />
-            </button>
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-sm" style={{ backgroundColor: "#2563EB" }}>
-              N
-            </div>
+            <h1 style={{ fontSize: 28, fontWeight: 800, color: "#1F2937" }}>Xin chào, {userName}!</h1>
           </div>
         </div>
 

@@ -1,11 +1,23 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { Navbar } from "../components/Navbar";
+import { getUserInfo, formatUserPlan } from "../api";
 import { CheckCircle, X, Zap } from "lucide-react";
 
 export function Upgrade() {
   const navigate = useNavigate();
   const [upgraded, setUpgraded] = useState(false);
+  const [currentPlan, setCurrentPlan] = useState<string | null>(null);
+
+  useEffect(() => {
+    const userInfo = getUserInfo();
+    setCurrentPlan(userInfo?.plan || "FREE");
+  }, []);
+
+  const normalizedCurrentPlan = currentPlan?.trim().toUpperCase() || "FREE";
+  const isCurrentPlanFree = normalizedCurrentPlan === "FREE";
+  const isCurrentPlanProMonth = normalizedCurrentPlan.includes("PRO") && normalizedCurrentPlan.includes("MONTH");
+  const isCurrentPlanProYear = normalizedCurrentPlan.includes("PRO") && normalizedCurrentPlan.includes("YEAR");
 
   const handleUpgrade = () => {
     setUpgraded(true);
@@ -26,6 +38,14 @@ export function Upgrade() {
           </div>
           <h1 style={{ fontSize: 36, fontWeight: 800, color: "#1F2937" }}>Chọn gói của bạn</h1>
           <p style={{ color: "#6B7280", fontSize: 16, marginTop: 8 }}>Mở khóa toàn bộ tính năng không giới hạn</p>
+          {currentPlan && (
+            <div
+              className="inline-flex items-center gap-2 mt-4 px-4 py-2 rounded-full"
+              style={{ backgroundColor: "#f8fafc", color: "#2563eb", border: "1px solid #dbeafe" }}
+            >
+              Gói hiện tại: <strong>{formatUserPlan(currentPlan)}</strong>
+            </div>
+          )}
         </div>
 
         {upgraded && (
@@ -40,7 +60,13 @@ export function Upgrade() {
 
         <div className="grid md:grid-cols-3 gap-6">
           {/* MIỄN PHÍ */}
-          <div className="rounded-3xl p-8 shadow-sm" style={{ backgroundColor: "white", border: "1.5px solid #e5e7eb" }}>
+          <div
+            className="rounded-3xl p-8 shadow-sm"
+            style={{
+              backgroundColor: "white",
+              border: isCurrentPlanFree ? "2px solid #22c55e" : "1.5px solid #e5e7eb",
+            }}
+          >
             <div style={{ fontSize: 12, fontWeight: 700, color: "#9CA3AF", letterSpacing: 2, marginBottom: 8 }}>MIỄN PHÍ</div>
             <div style={{ fontSize: 48, fontWeight: 900, color: "#1F2937", lineHeight: 1 }}>0₫</div>
             <div style={{ color: "#6B7280", fontSize: 14, marginBottom: 28, marginTop: 4 }}>Miễn phí mãi mãi</div>
@@ -66,17 +92,25 @@ export function Upgrade() {
             ))}
 
             <button
-              className="w-full mt-8 py-4 rounded-xl border-2 text-sm font-bold transition-all hover:bg-blue-50"
-              style={{ borderColor: "#2563EB", color: "#2563EB" }}
+              className="w-full mt-8 py-4 rounded-xl border-2 text-sm font-bold transition-all"
+              style={{
+                borderColor: isCurrentPlanFree ? "#22c55e" : "#2563EB",
+                color: isCurrentPlanFree ? "#ffffff" : "#2563EB",
+                backgroundColor: isCurrentPlanFree ? "#16a34a" : "white",
+              }}
             >
-              Gói hiện tại
+              {isCurrentPlanFree ? "Gói hiện tại" : "Giữ nguyên miễn phí"}
             </button>
           </div>
 
           {/* CAO CẤP THÁNG */}
           <div
             className="rounded-3xl p-8 shadow-xl relative overflow-hidden"
-            style={{ background: "linear-gradient(145deg, #1e40af 0%, #2563EB 50%, #3b82f6 100%)", color: "white" }}
+            style={{
+              background: "linear-gradient(145deg, #1e40af 0%, #2563EB 50%, #3b82f6 100%)",
+              color: "white",
+              border: isCurrentPlanProMonth ? "2px solid #22c55e" : "none",
+            }}
           >
             <div style={{ position: "absolute", top: -50, right: -50, width: 200, height: 200, borderRadius: "50%", background: "rgba(255,255,255,0.06)" }} />
             <div style={{ position: "absolute", bottom: -30, left: -30, width: 150, height: 150, borderRadius: "50%", background: "rgba(255,255,255,0.04)" }} />
@@ -106,9 +140,13 @@ export function Upgrade() {
               <button
                 onClick={handleUpgrade}
                 className="w-full mt-8 py-4 rounded-xl font-bold text-sm transition-all hover:opacity-90"
-                style={{ backgroundColor: "white", color: "#2563EB", fontSize: 16 }}
+                style={{
+                  backgroundColor: isCurrentPlanProMonth ? "#22c55e" : "white",
+                  color: isCurrentPlanProMonth ? "white" : "#2563EB",
+                  fontSize: 16,
+                }}
               >
-                {upgraded ? "✓ Đã nâng cấp!" : "Nâng cấp ngay – 79.000₫/tháng"}
+                {isCurrentPlanProMonth ? "Gói hiện tại" : upgraded ? "✓ Đã nâng cấp!" : "Nâng cấp ngay – 79.000₫/tháng"}
               </button>
               <p style={{ fontSize: 12, opacity: 0.6, textAlign: "center", marginTop: 12 }}>
                 Hủy bất cứ lúc nào · Không phí ẩn
@@ -119,7 +157,11 @@ export function Upgrade() {
           {/* CAO CẤP NĂM */}
           <div
             className="rounded-3xl p-8 shadow-xl relative overflow-hidden"
-            style={{ background: "linear-gradient(145deg, #1e40af 0%, #2563EB 50%, #3b82f6 100%)", color: "white" }}
+            style={{
+              background: "linear-gradient(145deg, #1e40af 0%, #2563EB 50%, #3b82f6 100%)",
+              color: "white",
+              border: isCurrentPlanProYear ? "2px solid #22c55e" : "none",
+            }}
           >
             <div style={{ position: "absolute", top: -50, right: -50, width: 200, height: 200, borderRadius: "50%", background: "rgba(255,255,255,0.06)" }} />
             <div style={{ position: "absolute", bottom: -30, left: -30, width: 150, height: 150, borderRadius: "50%", background: "rgba(255,255,255,0.04)" }} />
@@ -147,9 +189,13 @@ export function Upgrade() {
               <button
                 onClick={handleUpgrade}
                 className="w-full mt-20 py-4 rounded-xl font-bold text-sm transition-all hover:opacity-90"
-                style={{ backgroundColor: "white", color: "#2563EB", fontSize: 16 }}
+                style={{
+                  backgroundColor: isCurrentPlanProYear ? "#22c55e" : "white",
+                  color: isCurrentPlanProYear ? "white" : "#2563EB",
+                  fontSize: 16,
+                }}
               >
-                {upgraded ? "✓ Đã nâng cấp!" : "Đăng ký năm – 799.000₫"}
+                {isCurrentPlanProYear ? "Gói hiện tại" : upgraded ? "✓ Đã nâng cấp!" : "Đăng ký năm – 799.000₫"}
               </button>
               <p style={{ fontSize: 12, opacity: 0.6, textAlign: "center", marginTop: 12 }}>
                 Hủy bất cứ lúc nào · Tiết kiệm 89.000₫/năm

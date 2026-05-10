@@ -1,6 +1,40 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router";
 import { Eye, EyeOff } from "lucide-react";
+import { login as loginApi, loginWithGoogle, ApiError, getAuthRole, isAdminRole, syncAdminAuth, formatUserPlan, type LoginRequest } from "../api";
+import { Navbar } from "../components/Navbar";
+
+// Google Sign-In types
+declare global {
+  interface Window {
+    google: {
+      accounts: {
+        id: {
+          initialize: (config: GoogleInitializeConfig) => void;
+          renderButton: (element: HTMLElement, config: GoogleButtonConfig) => void;
+          prompt: () => void;
+        };
+      };
+    };
+  }
+}
+
+interface GoogleInitializeConfig {
+  client_id: string;
+  callback: (response: GoogleCredentialResponse) => void;
+}
+
+interface GoogleCredentialResponse {
+  credential: string;
+  select_by: string;
+}
+
+interface GoogleButtonConfig {
+  theme?: 'outline' | 'filled_blue' | 'filled_black';
+  size?: 'large' | 'medium' | 'small';
+  width?: number;
+  text?: 'signin_with' | 'signup_with' | 'continue_with' | 'signup_with';
+}
 
 const logoImg = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='50' fill='%232563EB'/%3E%3C/svg%3E";
 
@@ -9,18 +43,128 @@ export function Login() {
   const [showPass, setShowPass] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [authDebug, setAuthDebug] = useState<any>(null);
 
-  const handleLogin = (e: React.FormEvent) => {
+  // Google Sign-In callback
+  const handleGoogleCallback = async (response: GoogleCredentialResponse) => {
+    setError("");
+    setGoogleLoading(true);
+
+    try {
+      const authResponse = await loginWithGoogle({ idToken: response.credential });
+      console.log("Login - Google Auth Response:", authResponse);
+      setAuthDebug(authResponse);
+      const role = getAuthRole(authResponse);
+      console.log("Login - Google Role:", role);
+      syncAdminAuth(role);
+
+      if (isAdminRole(role)) {
+        navigate("/admin");
+      } else {
+        navigate("/dashboard");
+      }
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError(err.message);
+      } else {
+        setError(err instanceof Error ? err.message : "Đăng nhập Google thất bại");
+      }
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
+  // Initialize Google Sign-In
+  useEffect(() => {
+    const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+
+    if (googleClientId && window.google) {
+      window.google.accounts.id.initialize({
+        client_id: googleClientId,
+        callback: handleGoogleCallback,
+      });
+    }
+  }, []);
+
+  // Render Google Sign-In button
+  useEffect(() => {
+    const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+
+    if (googleClientId && window.google) {
+      const buttonElement = document.getElementById('google-signin-btn');
+      if (buttonElement) {
+        window.google.accounts.id.renderButton(buttonElement, {
+          theme: 'outline',
+          size: 'large',
+          width: buttonElement.offsetWidth || 400,
+          text: 'continue_with'
+        });
+      }
+    }
+  }, []);
+
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    navigate("/dashboard");
+    setError("");
+    setLoading(true);
+
+    try {
+      const payload: LoginRequest = { email, password };
+      const authResponse = await loginApi(payload);
+      console.log("Login - Email/Password Auth Response:", authResponse);
+      setAuthDebug(authResponse);
+      const role = getAuthRole(authResponse);
+      console.log("Login - Email/Password Role:", role);
+      syncAdminAuth(role);
+
+      if (isAdminRole(role)) {
+        navigate("/admin");
+      } else {
+        navigate("/dashboard");
+      }
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError(err.message);
+      } else {
+        setError(err instanceof Error ? err.message : "Đăng nhập thất bại");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    setError("");
+    setGoogleLoading(true);
+
+    try {
+      // Trigger Google Sign-In prompt
+      if (window.google) {
+        window.google.accounts.id.prompt();
+      } else {
+        throw new Error("Google Sign-In chưa được tải");
+      }
+    } catch (err) {
+      setGoogleLoading(false);
+      if (err instanceof ApiError) {
+        setError(err.message);
+      } else {
+        setError(err instanceof Error ? err.message : "Không thể khởi tạo Google Sign-In");
+      }
+    }
   };
 
   return (
     <div
-      className="min-h-screen flex items-center justify-center p-4"
+      className="min-h-screen flex flex-col"
       style={{ background: "linear-gradient(135deg, #EFF6FF 0%, #dbeafe 100%)" }}
     >
-      <div className="w-full max-w-md">
+      {/* <Navbar transparent={true} /> */}
+      <div className="flex items-center justify-center p-4 flex-1">
+        <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <Link to="/" className="inline-flex items-center gap-2">
             <img 
@@ -79,10 +223,11 @@ export function Login() {
 
             <button
               type="submit"
-              className="w-full py-4 rounded-xl text-white font-bold shadow-md hover:opacity-90 transition-all"
+              disabled={loading}
+              className="w-full py-4 rounded-xl text-white font-bold shadow-md hover:opacity-90 transition-all disabled:cursor-not-allowed disabled:opacity-60"
               style={{ backgroundColor: "#2563EB", fontSize: 16 }}
             >
-              Đăng nhập
+              {loading ? "Đang đăng nhập..." : "Đăng nhập"}
             </button>
           </form>
 
@@ -92,27 +237,36 @@ export function Login() {
             <div className="flex-1 h-px" style={{ backgroundColor: "#e5e7eb" }} />
           </div>
 
-          <button
-            onClick={() => navigate("/dashboard")}
-            className="w-full py-3 rounded-xl flex items-center justify-center gap-3 border transition-all hover:bg-gray-50"
-            style={{ border: "1.5px solid #e5e7eb", color: "#374151", fontSize: 15, fontWeight: 600 }}
-          >
-            <svg width="20" height="20" viewBox="0 0 48 48">
-              <path fill="#4285F4" d="M44.5 20H24v8.5h11.8C34.6 33.1 30.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.1 8 2.9l6.3-6.3C34.5 5.9 29.6 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20c11 0 20-8 20-20 0-1.3-.2-2.7-.5-4z" />
-              <path fill="#34A853" d="M6.3 14.7l7 5.1C15.1 16 19.2 13 24 13c3.1 0 5.8 1.1 8 2.9l6.3-6.3C34.5 5.9 29.6 4 24 4c-7.6 0-14.2 4.3-17.7 10.7z" />
-              <path fill="#FBBC05" d="M24 44c5.9 0 11.1-2 14.9-5.3l-6.9-5.6C29.8 35 27 36 24 36c-6.2 0-10.6-2.9-11.8-7.5l-7 5.4C8 40.3 15.4 44 24 44z" />
-              <path fill="#EA4335" d="M44.5 20H24v8.5h11.8c-.9 2.6-2.7 4.8-5.1 6.3l6.9 5.6c4-3.8 6.4-9.4 6.4-16.4 0-1.3-.2-2.7-.5-4z" />
-            </svg>
-            Tiếp tục với Google
-          </button>
+          <div
+            id="google-signin-btn"
+            className="w-full flex justify-center"
+          ></div>
+
+          {error ? (
+            <div className="mb-4 rounded-xl bg-red-100 p-3 text-sm text-red-700">{error}</div>
+          ) : null}
+
+          {authDebug && (
+            <div className="mb-4 rounded-xl bg-slate-50 p-3 text-sm text-slate-700" style={{ border: "1px solid #e5e7eb" }}>
+              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>DEBUG AUTH RESPONSE</div>
+              <div>Email: {authDebug.email || "-"}</div>
+              <div>FullName: {authDebug.fullName || authDebug.user?.fullName || "-"}</div>
+              <div>Role: {authDebug.role || authDebug.user?.role || "-"}</div>
+              <div>Plan: {formatUserPlan(authDebug.plan || authDebug.user?.plan)}</div>
+              <div style={{ marginTop: 8, whiteSpace: "pre-wrap", fontSize: 12, color: "#6B7280" }}>
+                {JSON.stringify(authDebug, null, 2)}
+              </div>
+            </div>
+          )}
 
           <p className="text-center mt-6" style={{ fontSize: 14, color: "#6B7280" }}>
             Chưa có tài khoản?{" "}
-            <button onClick={() => navigate("/dashboard")} style={{ color: "#2563EB", fontWeight: 600 }}>
+            <button onClick={() => navigate("/register")} style={{ color: "#2563EB", fontWeight: 600 }}>
               Đăng ký miễn phí
             </button>
           </p>
         </div>
+      </div>
       </div>
     </div>
   );
