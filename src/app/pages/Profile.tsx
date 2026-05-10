@@ -1,12 +1,25 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { Navbar } from "../components/Navbar";
 import { LogOut, ChevronRight, Moon, Sun, Shield, Bell, HelpCircle } from "lucide-react";
+import { getUserInfo, logout, formatUserPlan } from "../api";
 
 export function Profile() {
   const navigate = useNavigate();
   const [darkMode, setDarkMode] = useState(false);
   const [notifications, setNotifications] = useState(true);
+  const [user, setUser] = useState<{ name: string; email: string; plan?: string } | null>(null);
+
+  useEffect(() => {
+    const userInfo = getUserInfo();
+    if (userInfo) {
+      setUser({
+        name: userInfo.name,
+        email: userInfo.email,
+        plan: userInfo.plan,
+      });
+    }
+  }, []);
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: "#f8fafc" }}>
@@ -19,18 +32,12 @@ export function Profile() {
           className="rounded-3xl p-6 mb-6 flex items-center gap-5 shadow-sm"
           style={{ backgroundColor: "white", border: "1px solid #e5e7eb" }}
         >
-          <div
-            className="w-20 h-20 rounded-2xl flex items-center justify-center text-white text-3xl font-black shadow-lg"
-            style={{ background: "linear-gradient(135deg, #2563EB, #1d4ed8)" }}
-          >
-            N
-          </div>
           <div>
-            <h2 style={{ fontSize: 22, fontWeight: 800, color: "#1F2937" }}>Nguyễn Nam</h2>
-            <p style={{ fontSize: 14, color: "#6B7280", marginTop: 2 }}>nguyen.nam@email.com</p>
+            <h2 style={{ fontSize: 22, fontWeight: 800, color: "#1F2937" }}>{user?.name || "Người dùng"}</h2>
+            <p style={{ fontSize: 14, color: "#6B7280", marginTop: 2 }}>{user?.email || "email@example.com"}</p>
             <div className="flex items-center gap-2 mt-3">
               <span className="px-3 py-1 rounded-full text-xs font-bold" style={{ backgroundColor: "#EFF6FF", color: "#2563EB" }}>
-                Gói miễn phí
+                {formatUserPlan(user?.plan)}
               </span>
               <button
                 onClick={() => navigate("/upgrade")}
@@ -120,7 +127,10 @@ export function Profile() {
 
         {/* Đăng xuất */}
         <button
-          onClick={() => navigate("/")}
+          onClick={async () => {
+            await logout();
+            navigate("/login");
+          }}
           className="w-full py-4 rounded-2xl flex items-center justify-center gap-2 font-bold transition-all hover:opacity-90"
           style={{ backgroundColor: "#fee2e2", color: "#DC2626", fontSize: 15 }}
         >

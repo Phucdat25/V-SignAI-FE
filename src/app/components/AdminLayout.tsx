@@ -14,6 +14,7 @@ import {
   Menu,
   X,
 } from "lucide-react";
+import { getAuthToken, clearAuthToken, getUserInfo, getAuthRole, isAdminRole, clearUserInfo } from "../api";
 
 const logoImg = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='50' fill='%232563EB'/%3E%3C/svg%3E";
 
@@ -38,15 +39,24 @@ export function AdminLayout({ children }: AdminLayoutProps) {
 
   // Check authentication on mount
   useEffect(() => {
-    const isAdminAuthenticated = localStorage.getItem("adminAuth");
-    if (!isAdminAuthenticated) {
-      navigate("/admin/login");
+    const token = getAuthToken();
+    if (!token) {
+      navigate("/login");
+      return;
+    }
+    
+    const user = getUserInfo();
+    const role = user?.role;
+    
+    if (!isAdminRole(role)) {
+      navigate("/dashboard");
     }
   }, [navigate]);
 
   const handleLogout = () => {
-    localStorage.removeItem("adminAuth");
-    navigate("/admin/login");
+    clearAuthToken();
+    clearUserInfo();
+    navigate("/login");
   };
 
   return (

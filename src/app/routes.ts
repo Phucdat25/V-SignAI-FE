@@ -19,7 +19,6 @@ import { SignLibrary } from "./pages/SignLibrary";
 import { History } from "./pages/History";
 import { Upgrade } from "./pages/Upgrade";
 import { Profile } from "./pages/Profile";
-import { AdminLogin } from "./pages/admin/AdminLogin";
 import { AdminDashboard } from "./pages/admin/AdminDashboard";
 import { UsersManagement } from "./pages/admin/UsersManagement";
 import { DatasetManagement } from "./pages/admin/DatasetManagement";
@@ -42,7 +41,6 @@ export const router = createBrowserRouter([
       { path: "history", Component: History },
       { path: "upgrade", Component: Upgrade },
       { path: "profile", Component: Profile },
-      { path: "admin/login", Component: AdminLogin },
       { path: "admin", Component: AdminDashboard },
       { path: "admin/users", Component: UsersManagement },
       { path: "admin/dataset", Component: DatasetManagement },

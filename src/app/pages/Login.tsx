@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router";
 import { Eye, EyeOff } from "lucide-react";
-import { login as loginApi, loginWithGoogle, ApiError, type LoginRequest } from "../api";
+import { login as loginApi, loginWithGoogle, ApiError, getAuthRole, isAdminRole, syncAdminAuth, formatUserPlan, type LoginRequest } from "../api";
+import { Navbar } from "../components/Navbar";
 
 // Google Sign-In types
 declare global {
@@ -45,6 +46,7 @@ export function Login() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [authDebug, setAuthDebug] = useState<any>(null);
 
   // Google Sign-In callback
   const handleGoogleCallback = async (response: GoogleCredentialResponse) => {
@@ -52,8 +54,18 @@ export function Login() {
     setGoogleLoading(true);
 
     try {
-      await loginWithGoogle({ idToken: response.credential });
-      navigate("/dashboard");
+      const authResponse = await loginWithGoogle({ idToken: response.credential });
+      console.log("Login - Google Auth Response:", authResponse);
+      setAuthDebug(authResponse);
+      const role = getAuthRole(authResponse);
+      console.log("Login - Google Role:", role);
+      syncAdminAuth(role);
+
+      if (isAdminRole(role)) {
+        navigate("/admin");
+      } else {
+        navigate("/dashboard");
+      }
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.message);
@@ -101,8 +113,18 @@ export function Login() {
 
     try {
       const payload: LoginRequest = { email, password };
-      await loginApi(payload);
-      navigate("/dashboard");
+      const authResponse = await loginApi(payload);
+      console.log("Login - Email/Password Auth Response:", authResponse);
+      setAuthDebug(authResponse);
+      const role = getAuthRole(authResponse);
+      console.log("Login - Email/Password Role:", role);
+      syncAdminAuth(role);
+
+      if (isAdminRole(role)) {
+        navigate("/admin");
+      } else {
+        navigate("/dashboard");
+      }
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.message);
@@ -137,10 +159,12 @@ export function Login() {
 
   return (
     <div
-      className="min-h-screen flex items-center justify-center p-4"
+      className="min-h-screen flex flex-col"
       style={{ background: "linear-gradient(135deg, #EFF6FF 0%, #dbeafe 100%)" }}
     >
-      <div className="w-full max-w-md">
+      {/* <Navbar transparent={true} /> */}
+      <div className="flex items-center justify-center p-4 flex-1">
+        <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <Link to="/" className="inline-flex items-center gap-2">
             <img 
@@ -222,6 +246,19 @@ export function Login() {
             <div className="mb-4 rounded-xl bg-red-100 p-3 text-sm text-red-700">{error}</div>
           ) : null}
 
+          {authDebug && (
+            <div className="mb-4 rounded-xl bg-slate-50 p-3 text-sm text-slate-700" style={{ border: "1px solid #e5e7eb" }}>
+              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>DEBUG AUTH RESPONSE</div>
+              <div>Email: {authDebug.email || "-"}</div>
+              <div>FullName: {authDebug.fullName || authDebug.user?.fullName || "-"}</div>
+              <div>Role: {authDebug.role || authDebug.user?.role || "-"}</div>
+              <div>Plan: {formatUserPlan(authDebug.plan || authDebug.user?.plan)}</div>
+              <div style={{ marginTop: 8, whiteSpace: "pre-wrap", fontSize: 12, color: "#6B7280" }}>
+                {JSON.stringify(authDebug, null, 2)}
+              </div>
+            </div>
+          )}
+
           <p className="text-center mt-6" style={{ fontSize: 14, color: "#6B7280" }}>
             Chưa có tài khoản?{" "}
             <button onClick={() => navigate("/register")} style={{ color: "#2563EB", fontWeight: 600 }}>
@@ -229,6 +266,7 @@ export function Login() {
             </button>
           </p>
         </div>
+      </div>
       </div>
     </div>
   );

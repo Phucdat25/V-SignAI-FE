@@ -14,13 +14,41 @@ export interface GoogleLoginRequest {
   idToken: string;
 }
 
+export type UserRole = string;
+
+export interface AuthUser {
+  id: string;
+  email: string;
+  name: string;
+  fullName?: string;
+  role?: UserRole;
+  plan?: string;
+}
+
+// Backend response format
+export interface BackendAuthResponse {
+  token: string;
+  email?: string;
+  fullName?: string;
+  user_Id?: number;
+  role?: UserRole;
+  plan?: string;
+  message?: string;
+  [key: string]: unknown;
+}
+
+interface JwtClaims {
+  role?: UserRole | UserRole[];
+  roles?: UserRole | UserRole[];
+  authority?: UserRole | UserRole[];
+  authorities?: UserRole | UserRole[];
+}
+
 export interface AuthResponse {
   token: string;
-  user?: {
-    id: string;
-    email: string;
-    name: string;
-  };
+  user?: AuthUser;
+  role?: UserRole;
+  plan?: string;
 }
 
 export class ApiError extends Error {
@@ -38,10 +66,36 @@ export class ApiError extends Error {
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080";
 const AUTH_URL = API_BASE_URL.replace(/\/+$/, "") + "/auth";
 const TOKEN_KEY = "authToken";
+const USER_INFO_KEY = "userInfo";
 
 // ============ UTILS ============
 export function getAuthToken(): string | null {
   return localStorage.getItem(TOKEN_KEY);
+}
+
+export function setUserInfo(user: any): void {
+  // Normalize backend response to AuthUser format
+  const normalized: AuthUser = {
+    id: user.user_Id?.toString() || user.id || "",
+    email: user.email || "",
+    name: user.fullName || user.name || "",
+    fullName: user.fullName,
+    role: user.role,
+    plan: user.plan,
+  };
+  console.log("Auth - Setting user info (normalized):", normalized);
+  localStorage.setItem(USER_INFO_KEY, JSON.stringify(normalized));
+}
+
+export function getUserInfo(): AuthUser | null {
+  const data = localStorage.getItem(USER_INFO_KEY);
+  const user = data ? JSON.parse(data) : null;
+  console.log("Auth - Getting user info:", user);
+  return user;
+}
+
+export function clearUserInfo(): void {
+  localStorage.removeItem(USER_INFO_KEY);
 }
 
 export function setAuthToken(token: string): void {
@@ -50,6 +104,96 @@ export function setAuthToken(token: string): void {
 
 export function clearAuthToken(): void {
   localStorage.removeItem(TOKEN_KEY);
+}
+
+function decodeJwt(token: string): JwtClaims | undefined {
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) return undefined;
+
+    const payload = parts[1]
+      .replace(/-/g, "+")
+      .replace(/_/g, "/");
+
+    const decoded = atob(payload);
+    const json = decodeURIComponent(
+      decoded
+        .split("")
+        .map((char) => `%${char.charCodeAt(0).toString(16).padStart(2, "0")}`)
+        .join("")
+    );
+
+    return JSON.parse(json) as JwtClaims;
+  } catch {
+    return undefined;
+  }
+}
+
+function resolveClaimValue(value?: UserRole | UserRole[]): UserRole | undefined {
+  if (!value) return undefined;
+  return Array.isArray(value) ? value[0] : value;
+}
+
+export function getAuthRole(response: AuthResponse): UserRole | undefined {
+  const roleFromUser = response.user?.role;
+  if (roleFromUser) {
+    console.log("Auth - Role from user object:", roleFromUser);
+    return roleFromUser;
+  }
+  if (response.role) {
+    console.log("Auth - Role from response.role:", response.role);
+    return response.role;
+  }
+
+  const claims = decodeJwt(response.token);
+  console.log("Auth - JWT Claims:", claims);
+  if (!claims) return undefined;
+
+  const resolvedRole =
+    resolveClaimValue(claims.role) ||
+    resolveClaimValue(claims.roles) ||
+    resolveClaimValue(claims.authority) ||
+    resolveClaimValue(claims.authorities);
+
+  console.log("Auth - Resolved role from JWT:", resolvedRole);
+  return resolvedRole;
+}
+
+export function isAdminRole(role?: UserRole): boolean {
+  return !!role && role.toString().toLowerCase().includes("admin");
+}
+
+export function syncAdminAuth(role?: UserRole): void {
+  if (isAdminRole(role)) {
+    localStorage.setItem("adminAuth", "true");
+  } else {
+    localStorage.removeItem("adminAuth");
+  }
+}
+
+export function formatUserPlan(plan?: string): string {
+  if (!plan) return "Gói miễn phí";
+
+  const normalized = plan.trim().toUpperCase();
+  if (["FREE", "FREE_PLAN", "PRO_FREE"].includes(normalized)) {
+    return "Gói miễn phí";
+  }
+  if (["PRO_MONTHLY", "PRO_MONTH", "PRO_MONTHLY_PLAN", "PROMONTHLY", "PRO_MONTHLY"]
+    .includes(normalized)) {
+    return "Gói cao cấp tháng";
+  }
+  if (["PRO_YEARLY", "PRO_YEAR", "PRO_YEARLY_PLAN", "PROYEARLY", "PRO_YEARLY"]
+    .includes(normalized)) {
+    return "Gói cao cấp năm";
+  }
+  if (normalized === "PRO" || normalized === "CASH") {
+    return "Gói cao cấp";
+  }
+  if (plan.toLowerCase().includes("monthly")) return "Gói cao cấp tháng";
+  if (plan.toLowerCase().includes("year")) return "Gói cao cấp năm";
+  if (plan.toLowerCase().includes("free")) return "Gói miễn phí";
+
+  return plan;
 }
 
 async function apiCall<T>(
@@ -127,7 +271,14 @@ export async function login(payload: LoginRequest): Promise<AuthResponse> {
     method: "POST",
     body: JSON.stringify(payload),
   });
+  console.log("Login Response:", response);
   setAuthToken(response.token);
+  if (response.user) {
+    setUserInfo(response.user);
+  } else {
+    // Backend might return data directly in response
+    setUserInfo(response as any);
+  }
   return response;
 }
 
@@ -138,7 +289,13 @@ export async function register(
     method: "POST",
     body: JSON.stringify(payload),
   });
+  console.log("Register Response:", response);
   setAuthToken(response.token);
+  if (response.user) {
+    setUserInfo(response.user);
+  } else {
+    setUserInfo(response as any);
+  }
   return response;
 }
 
@@ -149,10 +306,17 @@ export async function loginWithGoogle(
     method: "POST",
     body: JSON.stringify(payload),
   });
+  console.log("Google Login Response:", response);
   setAuthToken(response.token);
+  if (response.user) {
+    setUserInfo(response.user);
+  } else {
+    setUserInfo(response as any);
+  }
   return response;
 }
 
 export async function logout(): Promise<void> {
   clearAuthToken();
+  clearUserInfo();
 }

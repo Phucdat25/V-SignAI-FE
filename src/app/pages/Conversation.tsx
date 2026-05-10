@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Navbar } from "../components/Navbar";
+import { post } from "../api/client";
 import { Mic, MicOff, Volume2, Camera, CameraOff, Hand, Send, RotateCcw, User, MessageSquare } from "lucide-react";
 
 const QUICK_PHRASES = [
@@ -43,6 +44,59 @@ export function Conversation() {
   const [isDetecting, setIsDetecting] = useState(false);
   const [detectedSignText, setDetectedSignText] = useState("");
   const [editableText, setEditableText] = useState("");
+  const [cameraError, setCameraError] = useState("");
+  const [textToSignError, setTextToSignError] = useState("");
+  const [signToTextError, setSignToTextError] = useState("");
+  const [recognitionError, setRecognitionError] = useState("");
+  const [isRecognitionSupported, setIsRecognitionSupported] = useState(false);
+
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const audioStreamRef = useRef<MediaStream | null>(null);
+  const recognitionRef = useRef<any>(null);
+
+  const startCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      mediaStreamRef.current = stream;
+      setCameraError("");
+      setIsCameraActive(true);
+    } catch (error) {
+      console.error("Lỗi mở camera:", error);
+      setCameraError("Không thể mở camera. Vui lòng kiểm tra quyền truy cập camera trên trình duyệt.");
+      setIsCameraActive(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isCameraActive && videoRef.current && mediaStreamRef.current) {
+      videoRef.current.srcObject = mediaStreamRef.current;
+      videoRef.current.play().catch((playError) => {
+        console.warn("Không thể tự động phát video camera:", playError);
+      });
+    }
+  }, [isCameraActive]);
+
+  const stopCamera = () => {
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach((track) => track.stop());
+      mediaStreamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    setIsCameraActive(false);
+  };
+
+  const toggleCamera = () => {
+    if (isCameraActive) {
+      stopCamera();
+      setDetectedSignText("");
+      setEditableText("");
+    } else {
+      startCamera();
+    }
+  };
 
   // Conversation history
   const [messages, setMessages] = useState<MessageType[]>([]);
@@ -52,10 +106,47 @@ export function Conversation() {
   const demoSignIndex = useRef(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Speech recognition simulation
-  const startListening = () => {
+  const stopListening = () => {
+    setIsListening(false);
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch (error) {
+        console.warn("Lỗi khi dừng nhận dạng giọng nói:", error);
+      }
+    }
+    if (audioStreamRef.current) {
+      audioStreamRef.current.getTracks().forEach((track) => track.stop());
+      audioStreamRef.current = null;
+    }
+    if (intervalRef.current) clearInterval(intervalRef.current);
+  };
+
+  const startListening = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      audioStreamRef.current = stream;
+      setRecognitionError("");
+    } catch (error) {
+      console.error("Lỗi truy cập mic:", error);
+      setRecognitionError("Không thể truy cập micro. Vui lòng kiểm tra quyền truy cập micro trên trình duyệt.");
+      return;
+    }
+
     setIsListening(true);
     setRecognizedText("");
+
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.start();
+      } catch (error) {
+        console.warn("Lỗi bắt đầu nhận dạng giọng nói:", error);
+        setRecognitionError("Không thể bắt đầu nhận dạng giọng nói. Vui lòng thử lại.");
+        setIsListening(false);
+      }
+      return;
+    }
+
     let charIndex = 0;
     const targetText = DEMO_SPEECH[demoSpeechIndex.current % DEMO_SPEECH.length];
     demoSpeechIndex.current++;
@@ -70,53 +161,70 @@ export function Conversation() {
     }, 60);
   };
 
-  const stopListening = () => {
-    setIsListening(false);
-    if (intervalRef.current) clearInterval(intervalRef.current);
-  };
-
   // Translate speech to sign
-  const translateToSign = () => {
+  const translateToSign = async () => {
     const text = recognizedText || manualInput;
     if (!text) return;
     
     setIsTranslating(true);
-    setTimeout(() => {
-      setSignAnimation(text);
-      setIsTranslating(false);
-      
-      // Add to conversation history
+    setTextToSignError("");
+
+    const startTime = Date.now();
+
+    try {
+      const usedSeconds = Math.max(1, Math.round((Date.now() - startTime) / 1000));
+      const result = await post<string>('/translate/text-to-sign', { text, usedSeconds });
+      const animationText = result || text;
+      setSignAnimation(animationText);
+
       const newMessage: MessageType = {
         id: Date.now(),
         type: "voice",
         original: text,
-        translated: `[Sign animation: ${text}]`,
+        translated: animationText,
         timestamp: new Date(),
       };
       setMessages(prev => [...prev, newMessage]);
-    }, 1500);
-  };
-
-  // Camera detection simulation
-  const toggleCamera = () => {
-    setIsCameraActive(!isCameraActive);
-    if (!isCameraActive) {
-      setDetectedSignText("");
-      setEditableText("");
+    } catch (error) {
+      console.error("Lỗi API text-to-sign:", error);
+      setTextToSignError("Lỗi dịch sang ký hiệu. Vui lòng thử lại.");
+    } finally {
+      setIsTranslating(false);
     }
   };
 
-  const startDetection = () => {
+  const startDetection = async () => {
     if (!isCameraActive) return;
-    
+    if (!videoRef.current) return;
+
     setIsDetecting(true);
-    setTimeout(() => {
-      const detected = DEMO_SIGN_TEXT[demoSignIndex.current % DEMO_SIGN_TEXT.length];
-      demoSignIndex.current++;
+    setSignToTextError("");
+
+    const startTime = Date.now();
+
+    try {
+      const video = videoRef.current;
+      const canvas = document.createElement("canvas");
+      canvas.width = video.videoWidth || 640;
+      canvas.height = video.videoHeight || 480;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("Không thể tạo canvas");
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const imageData = canvas.toDataURL("image/jpeg", 0.8);
+
+      const usedSeconds = Math.max(1, Math.round((Date.now() - startTime) / 1000));
+      const response = await post<string>('/translate/sign-to-text', { image: imageData, usedSeconds });
+      const detected = response || "";
       setDetectedSignText(detected);
       setEditableText(detected);
+    } catch (error) {
+      console.error("Lỗi API sign-to-text:", error);
+      setSignToTextError("Lỗi nhận dạng ký hiệu. Vui lòng thử lại.");
+      setDetectedSignText("");
+      setEditableText("");
+    } finally {
       setIsDetecting(false);
-    }, 2000);
+    }
   };
 
   // Play voice from detected sign
@@ -164,7 +272,59 @@ export function Conversation() {
     }
   };
 
-  useEffect(() => () => { if (intervalRef.current) clearInterval(intervalRef.current); }, []);
+  useEffect(() => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = true;
+      recognition.lang = "vi-VN";
+
+      recognition.onresult = (event: any) => {
+        const transcript = Array.from(event.results)
+          .map((result: any) => result[0].transcript)
+          .join("");
+        setRecognizedText(transcript);
+      };
+
+      recognition.onerror = (event: any) => {
+        console.error("Speech recognition error:", event);
+        setRecognitionError("Lỗi nhận diện giọng nói. Vui lòng thử lại.");
+        setIsListening(false);
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+
+      recognitionRef.current = recognition;
+      setIsRecognitionSupported(true);
+    }
+
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks().forEach((track) => track.stop());
+      }
+      if (audioStreamRef.current) {
+        audioStreamRef.current.getTracks().forEach((track) => track.stop());
+      }
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch {}
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (isCameraActive && videoRef.current && mediaStreamRef.current) {
+      videoRef.current.srcObject = mediaStreamRef.current;
+      videoRef.current.play().catch((playError) => {
+        console.warn("Không thể tự động phát video camera:", playError);
+      });
+    }
+  }, [isCameraActive]);
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: "#f1f5f9" }}>
@@ -254,8 +414,16 @@ export function Conversation() {
               )}
             </div>
 
+            {recognitionError && (
+              <div className="mb-4 rounded-2xl p-4" style={{ backgroundColor: "#FEF3C7", border: "2px solid #FDE68A" }}>
+                <p style={{ fontSize: 13, color: "#92400E" }}>
+                  {recognitionError}
+                </p>
+              </div>
+            )}
+
             {/* Manual Text Input */}
-            <textarea
+            {/* <textarea
               value={manualInput}
               onChange={(e) => setManualInput(e.target.value)}
               placeholder="Hoặc gõ văn bản thủ công..."
@@ -269,7 +437,7 @@ export function Conversation() {
               }}
               onFocus={(e) => (e.currentTarget.style.borderColor = "#2563EB")}
               onBlur={(e) => (e.currentTarget.style.borderColor = "#e5e7eb")}
-            />
+            /> */}
 
             {/* Translate Button */}
             <button
@@ -285,6 +453,12 @@ export function Conversation() {
               <Send size={20} />
               {isTranslating ? "Đang dịch..." : "Dịch sang ký hiệu"}
             </button>
+
+            {textToSignError && (
+              <div className="mt-3 rounded-2xl p-3" style={{ backgroundColor: "#FEE2E2", border: "1px solid #FCA5A5" }}>
+                <p style={{ fontSize: 13, color: "#B91C1C" }}>{textToSignError}</p>
+              </div>
+            )}
 
             {/* Sign Animation Display */}
             {signAnimation && (
@@ -341,20 +515,27 @@ export function Conversation() {
             >
               {isCameraActive ? (
                 <div className="w-full h-full relative">
-                  {/* Camera Active Placeholder */}
-                  <div className="absolute inset-0 flex items-center justify-center" style={{ backgroundColor: "#1a1a1a" }}>
-                    <div className="text-center">
-                      <Camera size={64} color="#16A34A" className="mx-auto mb-3" />
-                      <p style={{ color: "#16A34A", fontSize: 16, fontWeight: 600 }}>
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    muted
+                    playsInline
+                    className="absolute inset-0 w-full h-full object-cover"
+                    style={{ backgroundColor: "black" }}
+                  />
+
+                  <div className="absolute inset-0 bg-black/20" />
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div className="text-center text-white">
+                      <p style={{ fontSize: 16, fontWeight: 700 }}>
                         📹 Camera đang hoạt động
                       </p>
-                      <p style={{ color: "#9CA3AF", fontSize: 13, marginTop: 8 }}>
+                      <p style={{ fontSize: 13, marginTop: 8 }}>
                         Thực hiện ký hiệu trước camera
                       </p>
                     </div>
                   </div>
-                  
-                  {/* Status Indicator */}
+
                   <div className="absolute top-4 left-4 flex items-center gap-2 px-3 py-2 rounded-lg" style={{ backgroundColor: "rgba(22, 163, 74, 0.9)" }}>
                     <div className="w-2 h-2 rounded-full bg-white animate-pulse" />
                     <span style={{ color: "white", fontSize: 12, fontWeight: 700 }}>LIVE</span>
@@ -415,6 +596,28 @@ export function Conversation() {
                 {isDetecting ? "Đang nhận dạng..." : "Nhận dạng"}
               </button>
             </div>
+
+            {cameraError && (
+              <div className="mb-4 rounded-2xl p-4" style={{ backgroundColor: "#FEE2E2", border: "2px solid #FCA5A5" }}>
+                <p style={{ fontSize: 14, fontWeight: 700, color: "#B91C1C" }}>
+                  Lỗi camera
+                </p>
+                <p style={{ fontSize: 13, color: "#991B1B", marginTop: 4 }}>
+                  {cameraError}
+                </p>
+              </div>
+            )}
+
+            {signToTextError && (
+              <div className="mb-4 rounded-2xl p-4" style={{ backgroundColor: "#FEE2E2", border: "2px solid #FCA5A5" }}>
+                <p style={{ fontSize: 14, fontWeight: 700, color: "#B91C1C" }}>
+                  Lỗi nhận dạng
+                </p>
+                <p style={{ fontSize: 13, color: "#991B1B", marginTop: 4 }}>
+                  {signToTextError}
+                </p>
+              </div>
+            )}
 
             {/* Detection Output */}
             {detectedSignText && (

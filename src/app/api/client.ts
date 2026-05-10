@@ -64,7 +64,15 @@ export async function apiRequest<T>(
       );
     }
 
-    return text ? JSON.parse(text) : ({} as T);
+    if (!text) {
+      return {} as T;
+    }
+
+    try {
+      return JSON.parse(text) as T;
+    } catch {
+      return text as unknown as T;
+    }
   } catch (error) {
     if (error instanceof ApiError) {
       throw error;

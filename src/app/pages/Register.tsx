@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router";
 import { register as registerApi, ApiError, type RegisterRequest } from "../api";
+import { Navbar } from "../components/Navbar";
 
 const logoImg = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='50' fill='%232563EB'/%3E%3C/svg%3E";
 
@@ -34,10 +35,11 @@ export function Register() {
 
   return (
     <div
-      className="min-h-screen flex items-center justify-center p-4"
+      className="min-h-screen flex flex-col"
       style={{ background: "linear-gradient(135deg, #EFF6FF 0%, #dbeafe 100%)" }}
     >
-      <div className="w-full max-w-md">
+        <div className="flex items-center justify-center p-4 flex-1">
+        <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <Link to="/" className="inline-flex items-center gap-2">
             <img src={logoImg} alt="V-Sign AI Logo" className="h-12 w-12 object-contain" />
@@ -117,6 +119,7 @@ export function Register() {
             Đã có tài khoản? <Link to="/login" style={{ color: "#2563EB", fontWeight: 600 }}>Đăng nhập</Link>
           </p>
         </div>
+      </div>
       </div>
     </div>
   );
