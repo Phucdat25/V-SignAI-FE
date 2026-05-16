@@ -1,21 +1,17 @@
 import { useState, useRef, useEffect } from "react";
 import { Navbar } from "../components/Navbar";
 import { get, post } from "../api/client";
+import { ApiError } from "../api";
 import { Mic, MicOff, Volume2, Camera, CameraOff, Hand, Send, RotateCcw, User, MessageSquare } from "lucide-react";
 
 const QUICK_PHRASES = [
-  "Cảm ơn bạn",
+  "Xin chào",
   "Xin lỗi",
   "Tôi không hiểu",
   "Nói chậm hơn được không?",
   "Tôi cần giúp đỡ",
 ];
 
-const DEMO_SPEECH = [
-  "Xin chào, tôi cần khám bệnh hôm nay.",
-  "Bạn có hẹn trước không?",
-  "Tôi bị đau đầu và sốt từ sáng.",
-];
 
 const DEMO_SIGN_TEXT = [
   "Tôi cần giúp đỡ",
@@ -198,7 +194,15 @@ export function Conversation() {
       setMessages(prev => [...prev, newMessage]);
     } catch (error) {
       console.error("Lỗi API text-to-sign:", error);
-      setTextToSignError("Lỗi dịch sang ký hiệu. Vui lòng thử lại.");
+      setSignAnimation("");
+      setSignVideoUrl("");
+      setTextToSignError(
+        error instanceof ApiError
+          ? error.message
+          : error instanceof Error
+            ? error.message
+            : "Lỗi dịch sang ký hiệu. Vui lòng thử lại."
+      );
     } finally {
       setIsTranslating(false);
     }
@@ -230,7 +234,13 @@ export function Conversation() {
       setEditableText(detected);
     } catch (error) {
       console.error("Lỗi API sign-to-text:", error);
-      setSignToTextError("Lỗi nhận dạng ký hiệu. Vui lòng thử lại.");
+      setSignToTextError(
+        error instanceof ApiError
+          ? error.message
+          : error instanceof Error
+            ? error.message
+            : "Lỗi nhận dạng ký hiệu. Vui lòng thử lại."
+      );
       setDetectedSignText("");
       setEditableText("");
     } finally {
@@ -703,7 +713,7 @@ export function Conversation() {
         </div>
 
         {/* QUICK PHRASES SECTION */}
-        <div className="rounded-3xl p-6 shadow-lg mb-6" style={{ backgroundColor: "white" }}>
+        {/* <div className="rounded-3xl p-6 shadow-lg mb-6" style={{ backgroundColor: "white" }}>
           <div className="flex items-center gap-2 mb-4">
             <MessageSquare size={20} color="#7C3AED" />
             <h3 style={{ fontSize: 18, fontWeight: 700, color: "#1F2937" }}>
@@ -727,7 +737,7 @@ export function Conversation() {
               </button>
             ))}
           </div>
-        </div>
+        </div> */}
 
         {/* CONVERSATION HISTORY */}
         <div className="rounded-3xl p-6 shadow-lg" style={{ backgroundColor: "white" }}>

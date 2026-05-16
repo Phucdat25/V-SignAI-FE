@@ -28,7 +28,16 @@ export async function apiRequest<T>(
     "Content-Type": "application/json",
   };
 
-  // Merge additional headers safely
+  // Add auth token first
+  const token = getAuthToken();
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+    console.log("API Request - Adding Authorization header with token:", token.substring(0, 20) + "...");
+  } else {
+    console.warn("API Request - No auth token found in localStorage");
+  }
+
+  // Merge additional headers safely (this can override Authorization if needed)
   if (fetchOptions.headers) {
     if (Array.isArray(fetchOptions.headers)) {
       fetchOptions.headers.forEach(([key, value]) => {
@@ -43,12 +52,9 @@ export async function apiRequest<T>(
     }
   }
 
-  const token = getAuthToken();
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
-  }
-
   try {
+    console.log("API Request - URL:", url.toString());
+    console.log("API Request - Headers:", headers);
     const response = await fetch(url.toString(), {
       ...fetchOptions,
       headers,
@@ -57,10 +63,36 @@ export async function apiRequest<T>(
     const text = await response.text();
 
     if (!response.ok) {
+      let parsed: unknown = null;
+      let message = text || response.statusText || `HTTP ${response.status}`;
+
+      try {
+        parsed = JSON.parse(text);
+      } catch {
+        parsed = null;
+      }
+
+      if (parsed && typeof parsed === "object") {
+        const parsedRecord = parsed as Record<string, unknown>;
+        const rawMessage =
+          parsedRecord.message ||
+          parsedRecord.error ||
+          parsedRecord.detail ||
+          parsedRecord.description ||
+          parsedRecord.title ||
+          parsedRecord.Message;
+
+        if (typeof rawMessage === "string" && rawMessage.trim()) {
+          message = rawMessage.trim();
+        } else if (rawMessage && typeof rawMessage !== "string") {
+          message = JSON.stringify(rawMessage);
+        }
+      }
+
       throw new ApiError(
         response.status,
-        text || response.statusText || `HTTP ${response.status}`,
-        text
+        message,
+        parsed ?? text
       );
     }
 

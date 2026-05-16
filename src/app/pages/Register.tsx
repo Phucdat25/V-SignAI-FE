@@ -21,7 +21,11 @@ export function Register() {
     try {
       const payload: RegisterRequest = { name, email, password };
       await registerApi(payload);
-      navigate("/login");
+      navigate("/login", {
+        state: {
+          successMessage: "Đăng ký thành công! Vui lòng đăng nhập.",
+        },
+      });
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.message);

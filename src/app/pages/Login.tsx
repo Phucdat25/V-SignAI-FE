@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate, Link } from "react-router";
+import { useNavigate, useLocation, Link } from "react-router";
 import { Eye, EyeOff } from "lucide-react";
 import { login as loginApi, loginWithGoogle, ApiError, getAuthRole, isAdminRole, syncAdminAuth, formatUserPlan, type LoginRequest } from "../api";
 import { Navbar } from "../components/Navbar";
@@ -40,6 +40,8 @@ const logoImg = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' vi
 
 export function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const successMessage = (location.state as { successMessage?: string } | null)?.successMessage;
   const [showPass, setShowPass] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -179,6 +181,12 @@ export function Login() {
 
         <div className="rounded-3xl p-8 shadow-xl" style={{ backgroundColor: "white" }}>
           <h2 style={{ fontSize: 24, fontWeight: 700, color: "#1F2937", marginBottom: 24 }}>Đăng nhập</h2>
+
+          {successMessage ? (
+            <div className="mb-4 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-700">
+              {successMessage}
+            </div>
+          ) : null}
 
           <form onSubmit={handleLogin}>
             <div className="mb-5">
