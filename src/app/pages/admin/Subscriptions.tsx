@@ -1,104 +1,126 @@
+import { useEffect, useState } from "react";
 import { AdminLayout } from "../../components/AdminLayout";
-import { Edit, Users, DollarSign, TrendingUp, Calendar } from "lucide-react";
+import { Edit, Plus, Loader } from "lucide-react";
+import {
+  AdminSubscriptionPlanResponse,
+  SubscriptionPlanRequest,
+  createAdminSubscriptionPlan,
+  getAdminSubscriptionPlans,
+  updateAdminSubscriptionPlan,
+} from "../../api/admin-subscriptions";
 
-const subscriptionPlans = [
-  {
-    id: 1,
-    name: "Miễn phí",
-    price: "0₫",
-    period: "Mãi mãi",
-    activeUsers: 9611,
-    revenue: "0₫",
-    features: [
-      "5 phút/ngày nhận diện giọng nói",
-      "10 cụm từ nhanh",
-      "Thư viện ký hiệu cơ bản",
-    ],
-    color: "#6B7280",
-  },
-  {
-    id: 2,
-    name: "Cao cấp tháng",
-    price: "79,000₫",
-    period: "Mỗi tháng",
-    activeUsers: 2124,
-    revenue: "167,796,000₫",
-    features: [
-      "Nhận diện giọng nói không giới hạn",
-      "50+ cụm từ nhanh",
-      "Thư viện ký hiệu đầy đủ",
-      "Lưu toàn bộ lịch sử",
-      "Xuất hội thoại",
-      "Không quảng cáo",
-    ],
-    color: "#2563EB",
-  },
-  {
-    id: 3,
-    name: "Cao cấp năm",
-    price: "799,000₫",
-    period: "Mỗi năm",
-    activeUsers: 723,
-    revenue: "577,677,000₫",
-    features: [
-      "Tất cả tính năng gói Cao cấp",
-      "Tiết kiệm hơn so với trả theo tháng",
-      "Ưu tiên tốc độ AI",
-      "Hỗ trợ sớm tính năng mới",
-    ],
-    color: "#1d4ed8",
-  },
-];
+interface SubscriptionPlanFormValues extends SubscriptionPlanRequest {
+  isActive: boolean;
+}
 
-const recentSubscriptions = [
-  {
-    id: "SUB-8471",
-    user: "Nguyễn Văn An",
-    plan: "Cao cấp năm",
-    amount: "799,000₫",
-    status: "Hoạt động",
-    startDate: "1 Tháng 3, 2024",
-    nextBilling: "1 Tháng 3, 2025",
-  },
-  {
-    id: "SUB-8470",
-    user: "Trần Thị Bình",
-    plan: "Cao cấp tháng",
-    amount: "79,000₫",
-    status: "Hoạt động",
-    startDate: "10 Tháng 3, 2024",
-    nextBilling: "10 Tháng 4, 2024",
-  },
-  {
-    id: "SUB-8469",
-    user: "Lê Hoàng Minh",
-    plan: "Cao cấp năm",
-    amount: "799,000₫",
-    status: "Hoạt động",
-    startDate: "15 Tháng 2, 2024",
-    nextBilling: "15 Tháng 2, 2025",
-  },
-  {
-    id: "SUB-8468",
-    user: "Phạm Thu Hà",
-    plan: "Cao cấp tháng",
-    amount: "79,000₫",
-    status: "Đã hủy",
-    startDate: "5 Tháng 1, 2024",
-    nextBilling: "-",
-  },
-  {
-    id: "SUB-8467",
-    user: "Võ Minh Tuấn",
-    plan: "Cao cấp tháng",
-    amount: "79,000₫",
-    status: "Hoạt động",
-    startDate: "8 Tháng 3, 2024",
-    nextBilling: "8 Tháng 4, 2024",
-  },
-];
+const initialPlanFormState: SubscriptionPlanFormValues = {
+  code: "",
+  name: "",
+  price: 0,
+  currency: "VND",
+  intervalUnit: "MONTH",
+  intervalCount: 1,
+  isActive: true,
+};
 
 export function Subscriptions() {
+  const [plans, setPlans] = useState<AdminSubscriptionPlanResponse[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [formMode, setFormMode] = useState<"create" | "edit">("create");
+  const [formData, setFormData] = useState<SubscriptionPlanFormValues>(initialPlanFormState);
+  const [selectedPlan, setSelectedPlan] = useState<AdminSubscriptionPlanResponse | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadPlans = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const data = await getAdminSubscriptionPlans();
+        setPlans(data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Không thể tải danh sách gói");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadPlans();
+  }, []);
+
+  const handleOpenCreate = () => {
+    setFormMode("create");
+    setSelectedPlan(null);
+    setFormData(initialPlanFormState);
+    setFormError(null);
+    setSuccessMessage(null);
+  };
+
+  const handleOpenEdit = (plan: AdminSubscriptionPlanResponse) => {
+    setFormMode("edit");
+    setSelectedPlan(plan);
+    setFormData({
+      code: plan.code,
+      name: plan.name,
+      price: plan.price,
+      currency: plan.currency,
+      intervalUnit: plan.intervalUnit,
+      intervalCount: plan.intervalCount,
+      isActive: plan.isActive,
+    });
+    setFormError(null);
+    setSuccessMessage(null);
+  };
+
+  const handleFormChange = (
+    field: keyof SubscriptionPlanFormValues,
+    value: string | number | boolean
+  ) => {
+    setFormData((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
+  const handleSubmit = async () => {
+    setIsSubmitting(true);
+    setFormError(null);
+    setSuccessMessage(null);
+
+    const payload: SubscriptionPlanRequest = {
+      code: formData.code,
+      name: formData.name,
+      price: Number(formData.price),
+      currency: formData.currency,
+      intervalUnit: formData.intervalUnit,
+      intervalCount: Number(formData.intervalCount),
+      isActive: formData.isActive,
+    };
+
+    try {
+      if (formMode === "create") {
+        await createAdminSubscriptionPlan(payload);
+        setSuccessMessage("Tạo gói đăng ký thành công.");
+      } else if (selectedPlan) {
+        await updateAdminSubscriptionPlan(selectedPlan.id, payload);
+        setSuccessMessage("Cập nhật gói đăng ký thành công.");
+      }
+
+      const refreshedPlans = await getAdminSubscriptionPlans();
+      setPlans(refreshedPlans);
+      setSelectedPlan(null);
+      setFormMode("create");
+      setFormData(initialPlanFormState);
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : "Có lỗi xảy ra khi gửi dữ liệu");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <AdminLayout>
       <div className="space-y-6">
@@ -174,78 +196,222 @@ export function Subscriptions() {
 
         {/* Subscription Plans */}
         <div>
-          <h2 className="text-lg font-bold mb-4" style={{ color: "#1F2937" }}>
-            Các gói đăng ký
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {subscriptionPlans.map((plan) => (
-              <div
-                key={plan.id}
-                className="rounded-2xl p-6"
-                style={{ backgroundColor: "white", border: "2px solid #e5e7eb" }}
-              >
-                <div className="flex items-start justify-between mb-4">
-                  <div>
-                    <h3 className="text-xl font-bold" style={{ color: "#1F2937" }}>
-                      {plan.name}
-                    </h3>
-                    <p className="text-sm mt-1" style={{ color: "#6B7280" }}>
-                      {plan.period}
-                    </p>
-                  </div>
-                  <button
-                    className="p-2 rounded-lg hover:bg-gray-50 transition-colors"
-                    title="Chỉnh sửa gói"
-                  >
-                    <Edit size={18} style={{ color: plan.color }} />
-                  </button>
-                </div>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+            <div>
+              <h2 className="text-lg font-bold" style={{ color: "#1F2937" }}>
+                Các gói đăng ký
+              </h2>
+              <p className="text-sm mt-1" style={{ color: "#6B7280" }}>
+                Hiển thị và quản lý các gói đăng ký hiện có.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleOpenCreate}
+              className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold text-white"
+              style={{ backgroundColor: "#2563EB" }}
+            >
+              <Plus size={16} />
+              Tạo gói mới
+            </button>
+          </div>
 
-                <div className="mb-6">
-                  <div className="text-3xl font-bold" style={{ color: plan.color }}>
-                    {plan.price}
-                  </div>
-                </div>
+          {successMessage && (
+            <div className="rounded-2xl p-4" style={{ backgroundColor: "#ECFDF5", border: "1px solid #D1FAE5" }}>
+              <p className="text-sm font-medium" style={{ color: "#166534" }}>
+                {successMessage}
+              </p>
+            </div>
+          )}
 
-                <div className="space-y-4 mb-6">
-                  <div>
-                    <p className="text-xs mb-1" style={{ color: "#6B7280" }}>
-                      NGƯỜI DÙNG ĐANG HOẠT ĐỘNG
-                    </p>
-                    <p className="text-xl font-bold" style={{ color: "#1F2937" }}>
-                      {plan.activeUsers.toLocaleString()}
-                    </p>
+          {loading ? (
+            <div className="h-64 flex items-center justify-center rounded-2xl" style={{ backgroundColor: "white", border: "1px solid #e5e7eb" }}>
+              <Loader className="animate-spin" size={28} style={{ color: "#2563EB" }} />
+            </div>
+          ) : error ? (
+            <div className="rounded-2xl p-6" style={{ backgroundColor: "#FEF2F2", border: "1px solid #FECACA" }}>
+              <p className="text-sm font-medium" style={{ color: "#B91C1C" }}>
+                {error}
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {plans.map((plan) => (
+                <div
+                  key={plan.id}
+                  className="rounded-2xl p-6"
+                  style={{ backgroundColor: "white", border: "2px solid #e5e7eb" }}
+                >
+                  <div className="flex items-start justify-between gap-3 mb-4">
+                    <div>
+                      <h3 className="text-xl font-bold" style={{ color: "#1F2937" }}>
+                        {plan.name}
+                      </h3>
+                      <p className="text-sm mt-1" style={{ color: "#6B7280" }}>
+                        {plan.code} · {plan.intervalCount} {plan.intervalUnit.toLowerCase()}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenEdit(plan)}
+                      className="p-2 rounded-lg hover:bg-gray-50 transition-colors"
+                      title="Chỉnh sửa gói"
+                    >
+                      <Edit size={18} style={{ color: "#2563EB" }} />
+                    </button>
                   </div>
-                  <div>
-                    <p className="text-xs mb-1" style={{ color: "#6B7280" }}>
-                      DOANH THU THÁNG
-                    </p>
-                    <p className="text-xl font-bold" style={{ color: "#1F2937" }}>
-                      {plan.revenue}
-                    </p>
-                  </div>
-                </div>
 
-                <div className="pt-4 border-t" style={{ borderColor: "#e5e7eb" }}>
-                  <p className="text-xs font-semibold mb-3" style={{ color: "#6B7280" }}>
-                    TÍNH NĂNG
-                  </p>
-                  <ul className="space-y-2">
-                    {plan.features.map((feature, index) => (
-                      <li key={index} className="flex items-start gap-2">
-                        <div
-                          className="w-1 h-1 rounded-full mt-2"
-                          style={{ backgroundColor: plan.color }}
-                        />
-                        <span className="text-sm" style={{ color: "#1F2937" }}>
-                          {feature}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
+                  <div className="mb-6">
+                    <div className="text-3xl font-bold" style={{ color: "#2563EB" }}>
+                      {plan.price.toLocaleString("vi-VN")} {plan.currency}
+                    </div>
+                  </div>
+
+                  <div className="space-y-4 mb-6">
+                    <div>
+                      <p className="text-xs mb-1" style={{ color: "#6B7280" }}>
+                        NGƯỜI DÙNG ĐANG HOẠT ĐỘNG
+                      </p>
+                      <p className="text-xl font-bold" style={{ color: "#1F2937" }}>
+                        {plan.activeUserCount.toLocaleString()}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs mb-1" style={{ color: "#6B7280" }}>
+                        TRẠNG THÁI
+                      </p>
+                      <span
+                        className="inline-flex rounded-full px-3 py-1 text-xs font-semibold"
+                        style={{
+                          backgroundColor: plan.isActive ? "#DCFCE7" : "#FEE2E2",
+                          color: plan.isActive ? "#166534" : "#B91C1C",
+                        }}
+                      >
+                        {plan.isActive ? "Đang hoạt động" : "Không hoạt động"}
+                      </span>
+                    </div>
+                  </div>
                 </div>
+              ))}
+            </div>
+          )}
+
+          <div className="rounded-2xl p-6 mt-6" style={{ backgroundColor: "white", border: "1px solid #e5e7eb" }}>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-lg font-bold" style={{ color: "#1F2937" }}>
+                  {formMode === "create" ? "Tạo gói mới" : "Chỉnh sửa gói"}
+                </h3>
+                <p className="text-sm mt-1" style={{ color: "#6B7280" }}>
+                  {formMode === "create"
+                    ? "Nhập thông tin để tạo gói mới"
+                    : "Cập nhật thông tin gói hiện tại"}
+                </p>
               </div>
-            ))}
+              <button
+                type="button"
+                onClick={handleOpenCreate}
+                className="text-sm font-semibold text-blue-600 hover:text-blue-800"
+              >
+                Đặt lại form
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+              <label className="block">
+                <span className="text-sm font-medium text-gray-700">Mã gói</span>
+                <input
+                  type="text"
+                  value={formData.code}
+                  onChange={(event) => handleFormChange("code", event.target.value)}
+                  className="mt-2 w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                />
+              </label>
+              <label className="block">
+                <span className="text-sm font-medium text-gray-700">Tên gói</span>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(event) => handleFormChange("name", event.target.value)}
+                  className="mt-2 w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                />
+              </label>
+              <label className="block">
+                <span className="text-sm font-medium text-gray-700">Giá</span>
+                <input
+                  type="number"
+                  min={0}
+                  value={formData.price}
+                  onChange={(event) => handleFormChange("price", event.target.valueAsNumber)}
+                  className="mt-2 w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                />
+              </label>
+              <label className="block">
+                <span className="text-sm font-medium text-gray-700">Đơn vị tiền tệ</span>
+                <input
+                  type="text"
+                  value={formData.currency}
+                  onChange={(event) => handleFormChange("currency", event.target.value)}
+                  className="mt-2 w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                />
+              </label>
+              <label className="block">
+                <span className="text-sm font-medium text-gray-700">Chu kỳ</span>
+                <select
+                  value={formData.intervalUnit}
+                  onChange={(event) => handleFormChange("intervalUnit", event.target.value)}
+                  className="mt-2 w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                >
+                  <option value="DAY">Ngày</option>
+                  <option value="WEEK">Tuần</option>
+                  <option value="MONTH">Tháng</option>
+                  <option value="YEAR">Năm</option>
+                </select>
+              </label>
+              <label className="block">
+                <span className="text-sm font-medium text-gray-700">Số chu kỳ</span>
+                <input
+                  type="number"
+                  min={1}
+                  value={formData.intervalCount}
+                  onChange={(event) => handleFormChange("intervalCount", event.target.valueAsNumber)}
+                  className="mt-2 w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                />
+              </label>
+              <label className="block">
+                <span className="text-sm font-medium text-gray-700">Kích hoạt</span>
+                <select
+                  value={formData.isActive ? "active" : "inactive"}
+                  onChange={(event) => handleFormChange("isActive", event.target.value === "active")}
+                  className="mt-2 w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                >
+                  <option value="active">Đang hoạt động</option>
+                  <option value="inactive">Không hoạt động</option>
+                </select>
+              </label>
+            </div>
+
+            {formError && (
+              <p className="mt-4 text-sm text-red-600">{formError}</p>
+            )}
+
+            <div className="mt-4 flex flex-wrap gap-3 items-center">
+              <button
+                type="button"
+                onClick={handleSubmit}
+                disabled={isSubmitting}
+                className="rounded-xl bg-[#2563EB] px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-600 disabled:opacity-50"
+              >
+                {isSubmitting ? "Đang gửi..." : formMode === "create" ? "Tạo gói" : "Cập nhật gói"}
+              </button>
+              <button
+                type="button"
+                onClick={handleOpenCreate}
+                className="rounded-xl border border-gray-200 px-5 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+              >
+                Huỷ
+              </button>
+            </div>
           </div>
         </div>
 
