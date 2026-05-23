@@ -1,15 +1,27 @@
 import { AdminLayout } from "../../components/AdminLayout";
-import { TrendingUp, Users, MessageSquare, Clock } from "lucide-react";
+import {
+  TrendingUp,
+  Loader,
+  CalendarRange,
+  Calendar,
+  CalendarClock,
+  Percent,
+  ChevronDown,
+  Filter,
+  type LucideIcon,
+} from "lucide-react";
+import { useEffect, useState, type ReactNode } from "react";
+import {
+  getAdminRevenue,
+  getAdminConversionRate,
+  RevenueResponse,
+  ConversionRatePointResponse,
+} from "../../api/admin-users";
 import {
   LineChart,
   Line,
   BarChart,
   Bar,
-  AreaChart,
-  Area,
-  PieChart,
-  Pie,
-  Cell,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -37,164 +49,433 @@ const monthlyGrowthData = [
   { month: "T6", users: 12458, premium: 2847 },
 ];
 
-const featureUsageData = [
-  { name: "Giọng nói sang ký hiệu", value: 4200, color: "#2563EB" },
-  { name: "Ký hiệu sang giọng nói", value: 3100, color: "#1d4ed8" },
-  { name: "Thư viện ký hiệu", value: 1800, color: "#F59E0B" },
-  { name: "Cụm từ nhanh", value: 1400, color: "#10B981" },
+function formatVnd(amount: number): string {
+  return new Intl.NumberFormat("vi-VN").format(amount ?? 0) + " VND";
+}
+
+function toLocalDateString(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function formatDayLabel(isoDate: string): string {
+  const [y, m, d] = isoDate.split("-");
+  return `${d}/${m}/${y}`;
+}
+
+function parseMonthLabel(label: string): number {
+  const match = label.match(/\d+/);
+  return match ? Number(match[0]) : 1;
+}
+
+function getConversionSummary(points: ConversionRatePointResponse[], year: number) {
+  const currentYear = new Date().getFullYear();
+  const currentMonth = new Date().getMonth() + 1;
+
+  let targetMonth =
+    year === currentYear
+      ? currentMonth
+      : Math.max(...points.map((p) => parseMonthLabel(p.label)), 12);
+
+  let current =
+    points.find((p) => parseMonthLabel(p.label) === targetMonth) ?? null;
+
+  if (!current) {
+    current = [...points]
+      .reverse()
+      .find((p) => (p.totalUsers ?? 0) > 0) ?? null;
+    if (current) targetMonth = parseMonthLabel(current.label);
+  }
+
+  const prevMonth = targetMonth === 1 ? 12 : targetMonth - 1;
+  const previous = points.find((p) => parseMonthLabel(p.label) === prevMonth);
+  const rate = current?.conversionRate ?? 0;
+  const prevRate = previous?.conversionRate ?? 0;
+  const trend = Math.round((rate - prevRate) * 100) / 100;
+
+  return {
+    rate,
+    trend,
+    targetMonth,
+    premiumUsers: current?.premiumUsers ?? 0,
+    totalUsers: current?.totalUsers ?? 0,
+    periodLabel: current ? `${monthLabels[targetMonth - 1]}/${year}` : undefined,
+  };
+}
+
+const currentYear = new Date().getFullYear();
+const yearOptions = Array.from({ length: 6 }, (_, i) => currentYear - i);
+const monthOptions = Array.from({ length: 12 }, (_, i) => i + 1);
+const monthLabels = [
+  "Tháng 1", "Tháng 2", "Tháng 3", "Tháng 4", "Tháng 5", "Tháng 6",
+  "Tháng 7", "Tháng 8", "Tháng 9", "Tháng 10", "Tháng 11", "Tháng 12",
 ];
 
-const peakHoursData = [
-  { hour: "00:00", activity: 120 },
-  { hour: "03:00", activity: 80 },
-  { hour: "06:00", activity: 200 },
-  { hour: "09:00", activity: 850 },
-  { hour: "12:00", activity: 1200 },
-  { hour: "15:00", activity: 900 },
-  { hour: "18:00", activity: 1100 },
-  { hour: "21:00", activity: 650 },
-];
+interface RevenueCardProps {
+  title: string;
+  icon: LucideIcon;
+  accent: string;
+  accentBg: string;
+  loading: boolean;
+  error: string | null;
+  value: string;
+  periodLabel?: string;
+  filter: ReactNode;
+  footer?: ReactNode;
+}
 
-const topUsers = [
-  { rank: 1, name: "Nguyễn Văn An", translations: 2847, plan: "Cao cấp" },
-  { rank: 2, name: "Trần Thị Bình", translations: 2156, plan: "Cao cấp" },
-  { rank: 3, name: "Lê Hoàng Minh", translations: 1842, plan: "Cao cấp" },
-  { rank: 4, name: "Phạm Thu Hà", translations: 1534, plan: "Miễn phí" },
-  { rank: 5, name: "Võ Minh Tuấn", translations: 1247, plan: "Cao cấp" },
-];
+function RevenueCard({
+  title,
+  icon: Icon,
+  accent,
+  accentBg,
+  loading,
+  error,
+  value,
+  periodLabel,
+  filter,
+  footer,
+}: RevenueCardProps) {
+  return (
+    <div
+      className="flex flex-col rounded-2xl overflow-hidden h-full"
+      style={{ backgroundColor: "white", border: "1px solid #e5e7eb" }}
+    >
+      <div className="p-5 flex-1">
+        <div className="flex items-start gap-3">
+          <div
+            className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0"
+            style={{ backgroundColor: accentBg }}
+          >
+            <Icon size={22} style={{ color: accent }} strokeWidth={2} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-medium mb-1" style={{ color: "#6B7280" }}>
+              {title}
+            </p>
+            {loading ? (
+              <Loader className="animate-spin mt-1" size={20} style={{ color: accent }} />
+            ) : error ? (
+              <p className="text-xs mt-1 leading-snug" style={{ color: "#DC2626" }}>
+                {error}
+              </p>
+            ) : (
+              <p className="text-lg font-bold leading-tight" style={{ color: "#1F2937" }}>
+                {value}
+              </p>
+            )}
+            {periodLabel && !loading && !error && (
+              <p className="text-xs mt-1.5 font-medium" style={{ color: accent }}>
+                {periodLabel}
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div
+        className="px-4 pb-4 pt-3 border-t"
+        style={{ borderColor: "#f3f4f6", backgroundColor: "#f9fafb" }}
+      >
+        <div className="flex items-center gap-1.5 mb-2.5">
+          <Filter size={12} style={{ color: "#9CA3AF" }} />
+          <span className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: "#9CA3AF" }}>
+            Bộ lọc
+          </span>
+        </div>
+        {filter}
+        {footer && !loading && !error && (
+          <div className="mt-3 pt-3 border-t border-gray-200">{footer}</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function FilterSelect({
+  value,
+  onChange,
+  children,
+}: {
+  value: string | number;
+  onChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
+  children: ReactNode;
+}) {
+  return (
+    <div className="relative flex-1 min-w-0">
+      <select
+        value={value}
+        onChange={onChange}
+        className="w-full appearance-none pl-3 pr-8 py-2.5 rounded-xl text-sm font-medium border border-gray-200 bg-white text-gray-800 outline-none transition-shadow hover:border-gray-300 focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+      >
+        {children}
+      </select>
+      <ChevronDown
+        size={16}
+        className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400"
+      />
+    </div>
+  );
+}
+
+function FilterDateInput({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+}) {
+  return (
+    <div className="relative">
+      <CalendarClock
+        size={16}
+        className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400"
+      />
+      <input
+        type="date"
+        value={value}
+        onChange={onChange}
+        className="w-full pl-9 pr-3 py-2.5 rounded-xl text-sm font-medium border border-gray-200 bg-white text-gray-800 outline-none transition-shadow hover:border-gray-300 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
+      />
+    </div>
+  );
+}
 
 export function Analytics() {
+  const now = new Date();
+
+  const [yearFilter, setYearFilter] = useState(currentYear);
+  const [monthYearFilter, setMonthYearFilter] = useState(currentYear);
+  const [monthFilter, setMonthFilter] = useState(now.getMonth() + 1);
+  const [dayFilter, setDayFilter] = useState(() => toLocalDateString(new Date()));
+
+  const [yearRevenue, setYearRevenue] = useState<RevenueResponse | null>(null);
+  const [monthRevenue, setMonthRevenue] = useState<RevenueResponse | null>(null);
+  const [dayRevenue, setDayRevenue] = useState<RevenueResponse | null>(null);
+
+  const [yearLoading, setYearLoading] = useState(true);
+  const [monthLoading, setMonthLoading] = useState(true);
+  const [dayLoading, setDayLoading] = useState(true);
+
+  const [yearError, setYearError] = useState<string | null>(null);
+  const [monthError, setMonthError] = useState<string | null>(null);
+  const [dayError, setDayError] = useState<string | null>(null);
+
+  const [conversionYearFilter, setConversionYearFilter] = useState(currentYear);
+  const [conversionData, setConversionData] = useState<ConversionRatePointResponse[]>([]);
+  const [conversionLoading, setConversionLoading] = useState(true);
+  const [conversionError, setConversionError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchYearRevenue = async () => {
+      try {
+        setYearLoading(true);
+        setYearError(null);
+        const data = await getAdminRevenue({ type: "YEAR", year: yearFilter });
+        setYearRevenue(data);
+      } catch (err) {
+        setYearError(err instanceof Error ? err.message : "Không thể tải doanh thu");
+      } finally {
+        setYearLoading(false);
+      }
+    };
+    fetchYearRevenue();
+  }, [yearFilter]);
+
+  useEffect(() => {
+    const fetchMonthRevenue = async () => {
+      try {
+        setMonthLoading(true);
+        setMonthError(null);
+        const data = await getAdminRevenue({
+          type: "MONTH",
+          year: monthYearFilter,
+          month: monthFilter,
+        });
+        setMonthRevenue(data);
+      } catch (err) {
+        setMonthError(err instanceof Error ? err.message : "Không thể tải doanh thu");
+      } finally {
+        setMonthLoading(false);
+      }
+    };
+    fetchMonthRevenue();
+  }, [monthYearFilter, monthFilter]);
+
+  useEffect(() => {
+    const fetchDayRevenue = async () => {
+      try {
+        setDayLoading(true);
+        setDayError(null);
+        const data = await getAdminRevenue({ type: "DAY", date: dayFilter });
+        setDayRevenue(data);
+      } catch (err) {
+        setDayError(err instanceof Error ? err.message : "Không thể tải doanh thu");
+      } finally {
+        setDayLoading(false);
+      }
+    };
+    fetchDayRevenue();
+  }, [dayFilter]);
+
+  useEffect(() => {
+    const fetchConversionRate = async () => {
+      try {
+        setConversionLoading(true);
+        setConversionError(null);
+        const data = await getAdminConversionRate(conversionYearFilter);
+        setConversionData(data);
+      } catch (err) {
+        setConversionError(
+          err instanceof Error ? err.message : "Không thể tải tỉ lệ chuyển đổi"
+        );
+      } finally {
+        setConversionLoading(false);
+      }
+    };
+    fetchConversionRate();
+  }, [conversionYearFilter]);
+
+  const conversionSummary = getConversionSummary(conversionData, conversionYearFilter);
+
   return (
     <AdminLayout>
       <div className="space-y-6">
-        {/* Page Header */}
         <div>
           <h1 className="text-2xl font-bold" style={{ color: "#1F2937" }}>
-            Bảng điều khiển phân tích
+            Doanh thu & Phân tích
           </h1>
           <p className="text-sm mt-1" style={{ color: "#6B7280" }}>
-            Thông tin chi tiết về hiệu suất nền tảng và hành vi người dùng
+            Thông tin chi tiết về doanh thu và phân tích
           </p>
         </div>
 
-        {/* Key Metrics */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div
-            className="p-5 rounded-xl"
-            style={{ backgroundColor: "white", border: "1px solid #e5e7eb" }}
-          >
-            <div className="flex items-center gap-3 mb-3">
-              <div
-                className="w-12 h-12 rounded-xl flex items-center justify-center"
-                style={{ backgroundColor: "#FFF7ED" }}
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+          <RevenueCard
+            title="Doanh thu theo năm"
+            icon={CalendarRange}
+            accent="#2563EB"
+            accentBg="#EFF6FF"
+            loading={yearLoading}
+            error={yearError}
+            value={formatVnd(yearRevenue?.revenue ?? 0)}
+            periodLabel={yearRevenue?.label ? `Năm ${yearRevenue.label}` : undefined}
+            filter={
+              <FilterSelect
+                value={yearFilter}
+                onChange={(e) => setYearFilter(Number(e.target.value))}
               >
-                <Users size={24} style={{ color: "#2563EB" }} />
-              </div>
-              <div>
-                <p className="text-xs" style={{ color: "#6B7280" }}>
-                  Người dùng hoạt động hàng ngày
-                </p>
-                <p className="text-2xl font-bold" style={{ color: "#1F2937" }}>
-                  8,234
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-1">
-              <TrendingUp size={14} style={{ color: "#16A34A" }} />
-              <span className="text-xs font-semibold" style={{ color: "#16A34A" }}>
-                +12.5% so với tuần trước
-              </span>
-            </div>
-          </div>
+                {yearOptions.map((y) => (
+                  <option key={y} value={y}>
+                    Năm {y}
+                  </option>
+                ))}
+              </FilterSelect>
+            }
+          />
 
-          <div
-            className="p-5 rounded-xl"
-            style={{ backgroundColor: "white", border: "1px solid #e5e7eb" }}
-          >
-            <div className="flex items-center gap-3 mb-3">
-              <div
-                className="w-12 h-12 rounded-xl flex items-center justify-center"
-                style={{ backgroundColor: "#E0F2F1" }}
-              >
-                <MessageSquare size={24} style={{ color: "#1d4ed8" }} />
+          <RevenueCard
+            title="Doanh thu theo tháng"
+            icon={Calendar}
+            accent="#4F46E5"
+            accentBg="#EEF2FF"
+            loading={monthLoading}
+            error={monthError}
+            value={formatVnd(monthRevenue?.revenue ?? 0)}
+            periodLabel={monthRevenue?.label ? `Kỳ ${monthRevenue.label}` : undefined}
+            filter={
+              <div className="flex gap-2">
+                <FilterSelect
+                  value={monthFilter}
+                  onChange={(e) => setMonthFilter(Number(e.target.value))}
+                >
+                  {monthOptions.map((m) => (
+                    <option key={m} value={m}>
+                      {monthLabels[m - 1]}
+                    </option>
+                  ))}
+                </FilterSelect>
+                <FilterSelect
+                  value={monthYearFilter}
+                  onChange={(e) => setMonthYearFilter(Number(e.target.value))}
+                >
+                  {yearOptions.map((y) => (
+                    <option key={y} value={y}>
+                      {y}
+                    </option>
+                  ))}
+                </FilterSelect>
               </div>
-              <div>
-                <p className="text-xs" style={{ color: "#6B7280" }}>
-                  Dịch thuật hôm nay
-                </p>
-                <p className="text-2xl font-bold" style={{ color: "#1F2937" }}>
-                  8,942
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-1">
-              <TrendingUp size={14} style={{ color: "#16A34A" }} />
-              <span className="text-xs font-semibold" style={{ color: "#16A34A" }}>
-                +8.2% so với hôm qua
-              </span>
-            </div>
-          </div>
+            }
+          />
 
-          <div
-            className="p-5 rounded-xl"
-            style={{ backgroundColor: "white", border: "1px solid #e5e7eb" }}
-          >
-            <div className="flex items-center gap-3 mb-3">
-              <div
-                className="w-12 h-12 rounded-xl flex items-center justify-center"
-                style={{ backgroundColor: "#DCFCE7" }}
-              >
-                <TrendingUp size={24} style={{ color: "#16A34A" }} />
-              </div>
-              <div>
-                <p className="text-xs" style={{ color: "#6B7280" }}>
-                  Tỷ lệ chuyển đổi
-                </p>
-                <p className="text-2xl font-bold" style={{ color: "#1F2937" }}>
-                  22.8%
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-1">
-              <TrendingUp size={14} style={{ color: "#16A34A" }} />
-              <span className="text-xs font-semibold" style={{ color: "#16A34A" }}>
-                +3.2% tháng này
-              </span>
-            </div>
-          </div>
+          <RevenueCard
+            title="Doanh thu theo ngày"
+            icon={CalendarClock}
+            accent="#059669"
+            accentBg="#ECFDF5"
+            loading={dayLoading}
+            error={dayError}
+            value={formatVnd(dayRevenue?.revenue ?? 0)}
+            periodLabel={dayRevenue?.label ? formatDayLabel(dayRevenue.label) : undefined}
+            filter={
+              <FilterDateInput
+                value={dayFilter}
+                onChange={(e) => setDayFilter(e.target.value)}
+              />
+            }
+          />
 
-          <div
-            className="p-5 rounded-xl"
-            style={{ backgroundColor: "white", border: "1px solid #e5e7eb" }}
-          >
-            <div className="flex items-center gap-3 mb-3">
-              <div
-                className="w-12 h-12 rounded-xl flex items-center justify-center"
-                style={{ backgroundColor: "#FEF3C7" }}
+          <RevenueCard
+            title="Tỉ lệ chuyển đổi"
+            icon={Percent}
+            accent="#D97706"
+            accentBg="#FFFBEB"
+            loading={conversionLoading}
+            error={conversionError}
+            value={`${conversionSummary.rate}%`}
+            periodLabel={
+              conversionSummary.periodLabel
+                ? `${conversionSummary.periodLabel} · ${conversionSummary.premiumUsers}/${conversionSummary.totalUsers} cao cấp`
+                : undefined
+            }
+            filter={
+              <FilterSelect
+                value={conversionYearFilter}
+                onChange={(e) => setConversionYearFilter(Number(e.target.value))}
               >
-                <Clock size={24} style={{ color: "#F59E0B" }} />
+                {yearOptions.map((y) => (
+                  <option key={y} value={y}>
+                    Năm {y}
+                  </option>
+                ))}
+              </FilterSelect>
+            }
+            footer={
+              <div className="flex items-center gap-1.5">
+                <TrendingUp
+                  size={14}
+                  style={{
+                    color: conversionSummary.trend >= 0 ? "#16A34A" : "#DC2626",
+                  }}
+                />
+                <span
+                  className="text-xs font-semibold"
+                  style={{
+                    color: conversionSummary.trend >= 0 ? "#16A34A" : "#DC2626",
+                  }}
+                >
+                  {conversionSummary.trend >= 0 ? "+" : ""}
+                  {conversionSummary.trend}% so với tháng trước
+                </span>
               </div>
-              <div>
-                <p className="text-xs" style={{ color: "#6B7280" }}>
-                  Thời gian phiên TB
-                </p>
-                <p className="text-2xl font-bold" style={{ color: "#1F2937" }}>
-                  8p 42s
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-1">
-              <TrendingUp size={14} style={{ color: "#16A34A" }} />
-              <span className="text-xs font-semibold" style={{ color: "#16A34A" }}>
-                +5.7% so với tuần trước
-              </span>
-            </div>
-          </div>
+            }
+          />
         </div>
 
-        {/* Charts Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Weekly Activity */}
           <div
             className="p-6 rounded-2xl"
             style={{ backgroundColor: "white", border: "1px solid #e5e7eb" }}
@@ -229,36 +510,6 @@ export function Analytics() {
             </ResponsiveContainer>
           </div>
 
-          {/* Feature Usage */}
-          <div
-            className="p-6 rounded-2xl"
-            style={{ backgroundColor: "white", border: "1px solid #e5e7eb" }}
-          >
-            <h3 className="text-lg font-bold mb-4" style={{ color: "#1F2937" }}>
-              Phân bổ sử dụng tính năng
-            </h3>
-            <ResponsiveContainer width="100%" height={280}>
-              <PieChart>
-                <Pie
-                  data={featureUsageData}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                  outerRadius={80}
-                  fill="#8884d8"
-                  dataKey="value"
-                >
-                  {featureUsageData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-
-          {/* Monthly Growth */}
           <div
             className="p-6 rounded-2xl"
             style={{ backgroundColor: "white", border: "1px solid #e5e7eb" }}
@@ -277,135 +528,6 @@ export function Analytics() {
                 <Bar dataKey="premium" name="Cao cấp" fill="#2563EB" radius={[8, 8, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
-          </div>
-
-          {/* Peak Hours */}
-          <div
-            className="p-6 rounded-2xl"
-            style={{ backgroundColor: "white", border: "1px solid #e5e7eb" }}
-          >
-            <h3 className="text-lg font-bold mb-4" style={{ color: "#1F2937" }}>
-              Giờ cao điểm hoạt động
-            </h3>
-            <ResponsiveContainer width="100%" height={280}>
-              <AreaChart data={peakHoursData}>
-                <defs>
-                  <linearGradient id="colorActivity" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#2563EB" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#2563EB" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                <XAxis dataKey="hour" stroke="#9CA3AF" style={{ fontSize: 12 }} />
-                <YAxis stroke="#9CA3AF" style={{ fontSize: 12 }} />
-                <Tooltip />
-                <Area
-                  type="monotone"
-                  dataKey="activity"
-                  name="Hoạt động"
-                  stroke="#2563EB"
-                  strokeWidth={2}
-                  fillOpacity={1}
-                  fill="url(#colorActivity)"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* Top Users */}
-        <div
-          className="rounded-2xl overflow-hidden"
-          style={{ backgroundColor: "white", border: "1px solid #e5e7eb" }}
-        >
-          <div className="p-6 border-b" style={{ borderColor: "#e5e7eb" }}>
-            <h3 className="text-lg font-bold" style={{ color: "#1F2937" }}>
-              Người dùng hoạt động tích cực nhất
-            </h3>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead style={{ backgroundColor: "#f9fafb" }}>
-                <tr>
-                  <th
-                    className="text-left px-6 py-4 text-xs font-semibold"
-                    style={{ color: "#6B7280" }}
-                  >
-                    HẠNG
-                  </th>
-                  <th
-                    className="text-left px-6 py-4 text-xs font-semibold"
-                    style={{ color: "#6B7280" }}
-                  >
-                    TÊN NGƯỜI DÙNG
-                  </th>
-                  <th
-                    className="text-left px-6 py-4 text-xs font-semibold"
-                    style={{ color: "#6B7280" }}
-                  >
-                    TỔNG DỊCH THUẬT
-                  </th>
-                  <th
-                    className="text-left px-6 py-4 text-xs font-semibold"
-                    style={{ color: "#6B7280" }}
-                  >
-                    GÓI
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {topUsers.map((user) => (
-                  <tr
-                    key={user.rank}
-                    className="border-t hover:bg-gray-50"
-                    style={{ borderColor: "#e5e7eb" }}
-                  >
-                    <td className="px-6 py-4">
-                      <div
-                        className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm"
-                        style={{
-                          backgroundColor:
-                            user.rank === 1
-                              ? "#FFF7ED"
-                              : user.rank === 2
-                              ? "#F3F4F6"
-                              : user.rank === 3
-                              ? "#FEF3C7"
-                              : "#F9FAFB",
-                          color:
-                            user.rank === 1
-                              ? "#2563EB"
-                              : user.rank === 2
-                              ? "#6B7280"
-                              : user.rank === 3
-                              ? "#F59E0B"
-                              : "#9CA3AF",
-                        }}
-                      >
-                        {user.rank}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-sm font-semibold" style={{ color: "#1F2937" }}>
-                      {user.name}
-                    </td>
-                    <td className="px-6 py-4 text-sm font-semibold" style={{ color: "#1F2937" }}>
-                      {user.translations.toLocaleString()}
-                    </td>
-                    <td className="px-6 py-4">
-                      <span
-                        className="px-3 py-1 rounded-full text-xs font-semibold"
-                        style={{
-                          backgroundColor: user.plan === "Cao cấp" ? "#FFF7ED" : "#F3F4F6",
-                          color: user.plan === "Cao cấp" ? "#2563EB" : "#6B7280",
-                        }}
-                      >
-                        {user.plan}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
           </div>
         </div>
       </div>

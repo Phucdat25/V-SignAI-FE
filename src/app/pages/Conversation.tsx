@@ -1,21 +1,17 @@
 import { useState, useRef, useEffect } from "react";
 import { Navbar } from "../components/Navbar";
-import { post } from "../api/client";
+import { get, post } from "../api/client";
+import { ApiError } from "../api";
 import { Mic, MicOff, Volume2, Camera, CameraOff, Hand, Send, RotateCcw, User, MessageSquare } from "lucide-react";
 
 const QUICK_PHRASES = [
-  "Cảm ơn bạn",
+  "Xin chào",
   "Xin lỗi",
   "Tôi không hiểu",
   "Nói chậm hơn được không?",
   "Tôi cần giúp đỡ",
 ];
 
-const DEMO_SPEECH = [
-  "Xin chào, tôi cần khám bệnh hôm nay.",
-  "Bạn có hẹn trước không?",
-  "Tôi bị đau đầu và sốt từ sáng.",
-];
 
 const DEMO_SIGN_TEXT = [
   "Tôi cần giúp đỡ",
@@ -38,6 +34,7 @@ export function Conversation() {
   const [manualInput, setManualInput] = useState("");
   const [isTranslating, setIsTranslating] = useState(false);
   const [signAnimation, setSignAnimation] = useState("");
+  const [signVideoUrl, setSignVideoUrl] = useState("");
 
   // Sign to Speech states
   const [isCameraActive, setIsCameraActive] = useState(false);
@@ -169,25 +166,43 @@ export function Conversation() {
     setIsTranslating(true);
     setTextToSignError("");
 
-    const startTime = Date.now();
-
     try {
-      const usedSeconds = Math.max(1, Math.round((Date.now() - startTime) / 1000));
-      const result = await post<string>('/translate/text-to-sign', { text, usedSeconds });
-      const animationText = result || text;
-      setSignAnimation(animationText);
+      const endpoint = `/api/sign-videos/${encodeURIComponent(text)}`;
+      console.log("[translateToSign] request endpoint:", endpoint);
+      const result = await get<any>(endpoint);
+      console.log("[translateToSign] response payload:", result);
+
+      const animationText =
+        typeof result === "string"
+          ? result
+          : result?.keyword || text;
+      const videoUrl =
+        typeof result === "object" && result?.videoUrl
+          ? result.videoUrl
+          : "";
+
+      setSignAnimation(animationText || text);
+      setSignVideoUrl(videoUrl);
 
       const newMessage: MessageType = {
         id: Date.now(),
         type: "voice",
         original: text,
-        translated: animationText,
+        translated: animationText || text,
         timestamp: new Date(),
       };
       setMessages(prev => [...prev, newMessage]);
     } catch (error) {
       console.error("Lỗi API text-to-sign:", error);
-      setTextToSignError("Lỗi dịch sang ký hiệu. Vui lòng thử lại.");
+      setSignAnimation("");
+      setSignVideoUrl("");
+      setTextToSignError(
+        error instanceof ApiError
+          ? error.message
+          : error instanceof Error
+            ? error.message
+            : "Lỗi dịch sang ký hiệu. Vui lòng thử lại."
+      );
     } finally {
       setIsTranslating(false);
     }
@@ -219,7 +234,13 @@ export function Conversation() {
       setEditableText(detected);
     } catch (error) {
       console.error("Lỗi API sign-to-text:", error);
-      setSignToTextError("Lỗi nhận dạng ký hiệu. Vui lòng thử lại.");
+      setSignToTextError(
+        error instanceof ApiError
+          ? error.message
+          : error instanceof Error
+            ? error.message
+            : "Lỗi nhận dạng ký hiệu. Vui lòng thử lại."
+      );
       setDetectedSignText("");
       setEditableText("");
     } finally {
@@ -281,10 +302,21 @@ export function Conversation() {
       recognition.lang = "vi-VN";
 
       recognition.onresult = (event: any) => {
-        const transcript = Array.from(event.results)
-          .map((result: any) => result[0].transcript)
-          .join("");
-        setRecognizedText(transcript);
+        let finalTranscript = "";
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const result = event.results[i];
+          if (result.isFinal) {
+            finalTranscript += result[0].transcript;
+          }
+        }
+        if (finalTranscript) {
+          // Chuẩn hóa text: lowercase, loại bỏ dấu chấm cuối, normalize Unicode
+          const normalizedText = finalTranscript
+            .toLowerCase()
+            .replace(/[.,!?;:]$/, '') // Loại bỏ dấu chấm cuối
+            .normalize('NFC'); // Chuẩn hóa Unicode cho tiếng Việt
+          setRecognizedText(normalizedText);
+        }
       };
 
       recognition.onerror = (event: any) => {
@@ -460,8 +492,8 @@ export function Conversation() {
               </div>
             )}
 
-            {/* Sign Animation Display */}
-            {signAnimation && (
+            {/* Sign Animation / Video Display */}
+            {(signAnimation || signVideoUrl) && (
               <div className="mt-6 rounded-2xl p-6" style={{ backgroundColor: "#EFF6FF", border: "2px solid #BFDBFE" }}>
                 <div className="flex items-center gap-2 mb-3">
                   <Hand size={20} color="#2563EB" />
@@ -470,20 +502,32 @@ export function Conversation() {
                   </span>
                 </div>
                 <div 
-                  className="rounded-xl p-8 flex items-center justify-center"
+                  className="rounded-xl p-8 flex flex-col items-center justify-center"
                   style={{ backgroundColor: "#DBEAFE", minHeight: 120 }}
                 >
-                  <div className="text-center">
-                    <div className="mb-3 animate-bounce">
-                      <Hand size={48} color="#2563EB" />
+                  {signVideoUrl ? (
+                    <video
+                      src={signVideoUrl}
+                      controls
+                      autoPlay
+                      muted
+                      loop
+                      className="w-full max-w-full rounded-2xl"
+                      style={{ maxHeight: 320, backgroundColor: "black" }}
+                    />
+                  ) : (
+                    <div className="text-center">
+                      <div className="mb-3 animate-bounce">
+                        <Hand size={48} color="#2563EB" />
+                      </div>
+                      <p style={{ fontSize: 18, fontWeight: 700, color: "#1F2937" }}>
+                        {signAnimation}
+                      </p>
+                      <p style={{ fontSize: 12, color: "#6B7280", marginTop: 4 }}>
+                        [Avatar ký hiệu động sẽ hiển thị tại đây]
+                      </p>
                     </div>
-                    <p style={{ fontSize: 18, fontWeight: 700, color: "#1F2937" }}>
-                      {signAnimation}
-                    </p>
-                    <p style={{ fontSize: 12, color: "#6B7280", marginTop: 4 }}>
-                      [Avatar ký hiệu động sẽ hiển thị tại đây]
-                    </p>
-                  </div>
+                  )}
                 </div>
               </div>
             )}
@@ -669,7 +713,7 @@ export function Conversation() {
         </div>
 
         {/* QUICK PHRASES SECTION */}
-        <div className="rounded-3xl p-6 shadow-lg mb-6" style={{ backgroundColor: "white" }}>
+        {/* <div className="rounded-3xl p-6 shadow-lg mb-6" style={{ backgroundColor: "white" }}>
           <div className="flex items-center gap-2 mb-4">
             <MessageSquare size={20} color="#7C3AED" />
             <h3 style={{ fontSize: 18, fontWeight: 700, color: "#1F2937" }}>
@@ -693,7 +737,7 @@ export function Conversation() {
               </button>
             ))}
           </div>
-        </div>
+        </div> */}
 
         {/* CONVERSATION HISTORY */}
         <div className="rounded-3xl p-6 shadow-lg" style={{ backgroundColor: "white" }}>

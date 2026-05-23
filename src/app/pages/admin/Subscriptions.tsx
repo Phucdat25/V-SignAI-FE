@@ -108,12 +108,12 @@ export function Subscriptions() {
             Quản lý gói đăng ký
           </h1>
           <p className="text-sm mt-1" style={{ color: "#6B7280" }}>
-            Quản lý các gói đăng ký và theo dõi doanh thu
+            Quản lý các gói đăng ký
           </p>
         </div>
 
         {/* Revenue Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        {/* <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="p-4 rounded-xl" style={{ backgroundColor: "white", border: "1px solid #e5e7eb" }}>
             <div className="flex items-center gap-2 mb-2">
               <DollarSign size={18} style={{ color: "#2563EB" }} />
@@ -170,7 +170,7 @@ export function Subscriptions() {
               +3.2% tháng này
             </p>
           </div>
-        </div>
+        </div> */}
 
         {/* Subscription Plans */}
         <div>
@@ -250,7 +250,7 @@ export function Subscriptions() {
         </div>
 
         {/* Recent Subscriptions */}
-        <div
+        {/* <div
           className="rounded-2xl overflow-hidden"
           style={{ backgroundColor: "white", border: "1px solid #e5e7eb" }}
         >
@@ -352,7 +352,7 @@ export function Subscriptions() {
               </tbody>
             </table>
           </div>
-        </div>
+        </div> */}
       </div>
     </AdminLayout>
   );

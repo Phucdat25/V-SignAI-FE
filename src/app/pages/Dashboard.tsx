@@ -2,11 +2,15 @@ import { useNavigate } from "react-router";
 import { useEffect, useState } from "react";
 import { Navbar } from "../components/Navbar";
 import { MessageSquare, BookOpen, History, Zap, Mic, TrendingUp, Bell } from "lucide-react";
-import { getUserInfo } from "../api";
+import { getUserInfo, getTodayUsage, secondsToMinutes, getAuthToken } from "../api";
 
 export function Dashboard() {
   const navigate = useNavigate();
   const [userName, setUserName] = useState("");
+  const [usedMinutes, setUsedMinutes] = useState(0);
+  const [limitMinutes, setLimitMinutes] = useState(0);
+  const [remainingMinutes, setRemainingMinutes] = useState(0);
+  const [loadingUsage, setLoadingUsage] = useState(true);
 
   useEffect(() => {
     const user = getUserInfo();
@@ -17,6 +21,45 @@ export function Dashboard() {
     } else {
       console.warn("Dashboard - No user info found in localStorage");
     }
+
+    // Fetch usage data
+    const fetchUsage = async () => {
+      try {
+        setLoadingUsage(true);
+        const token = getAuthToken();
+        console.log("Dashboard - Auth token before API call:", token ? token.substring(0, 20) + "..." : "null");
+        
+        if (!token) {
+          console.warn("Dashboard - No auth token available, skipping usage fetch");
+          setUsedMinutes(0);
+          setLimitMinutes(5);
+          setRemainingMinutes(5);
+          setLoadingUsage(false);
+          return;
+        }
+        
+        const usage = await getTodayUsage();
+        console.log("Dashboard - Usage Data:", usage);
+        
+        const used = secondsToMinutes(usage.usedSeconds);
+        const limit = secondsToMinutes(usage.limitSeconds);
+        const remaining = secondsToMinutes(usage.remainingSeconds);
+        
+        setUsedMinutes(used);
+        setLimitMinutes(limit);
+        setRemainingMinutes(remaining);
+      } catch (error) {
+        console.error("Dashboard - Error fetching usage:", error);
+        // Fallback values if API fails
+        setUsedMinutes(0);
+        setLimitMinutes(5);
+        setRemainingMinutes(5);
+      } finally {
+        setLoadingUsage(false);
+      }
+    };
+
+    fetchUsage();
   }, []);
 
   return (
@@ -67,14 +110,30 @@ export function Dashboard() {
             </span>
           </div>
           <div>
-            <div className="flex justify-between mb-2">
-              <span style={{ fontSize: 14, color: "#374151" }}>Thời gian nhận diện</span>
-              <span style={{ fontSize: 14, fontWeight: 700, color: "#1F2937" }}>3 / 5 phút</span>
-            </div>
-            <div className="w-full rounded-full h-3" style={{ backgroundColor: "#e5e7eb" }}>
-              <div className="h-3 rounded-full transition-all" style={{ width: "60%", background: "linear-gradient(90deg, #2563EB, #60a5fa)" }} />
-            </div>
-            <p style={{ fontSize: 12, color: "#6B7280", marginTop: 6 }}>Còn 2 phút hôm nay</p>
+            {loadingUsage ? (
+              <div style={{ fontSize: 14, color: "#6B7280" }}>Đang tải dữ liệu...</div>
+            ) : (
+              <>
+                <div className="flex justify-between mb-2">
+                  <span style={{ fontSize: 14, color: "#374151" }}>Thời gian nhận diện</span>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: "#1F2937" }}>
+                    {usedMinutes} / {limitMinutes} phút
+                  </span>
+                </div>
+                <div className="w-full rounded-full h-3" style={{ backgroundColor: "#e5e7eb" }}>
+                  <div
+                    className="h-3 rounded-full transition-all"
+                    style={{
+                      width: `${limitMinutes > 0 ? (usedMinutes / limitMinutes) * 100 : 0}%`,
+                      background: "linear-gradient(90deg, #2563EB, #60a5fa)",
+                    }}
+                  />
+                </div>
+                <p style={{ fontSize: 12, color: "#6B7280", marginTop: 6 }}>
+                  Còn {remainingMinutes} phút hôm nay
+                </p>
+              </>
+            )}
           </div>
         </div>
 

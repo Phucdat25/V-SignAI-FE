@@ -196,6 +196,77 @@ export function formatUserPlan(plan?: string): string {
   return plan;
 }
 
+interface ErrorResponse {
+  status: number;
+  error: string;
+  message: string;
+  timestamp?: string;
+  [key: string]: unknown;
+}
+
+function tryParseJson(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
+
+function getReadableMessage(raw: unknown): string {
+  if (typeof raw === "string") {
+    return raw.trim();
+  }
+
+  if (Array.isArray(raw)) {
+    return raw.map((item) => getReadableMessage(item)).join("; ");
+  }
+
+  if (raw && typeof raw === "object") {
+    if ("message" in raw) {
+      return getReadableMessage((raw as Record<string, unknown>).message);
+    }
+    return Object.values(raw)
+      .map((value) => getReadableMessage(value))
+      .filter(Boolean)
+      .join("; ");
+  }
+
+  return "";
+}
+
+function extractServerMessage(endpoint: string, status: number, text: string): string {
+  const parsed = tryParseJson(text) as ErrorResponse | Record<string, unknown> | null;
+  const rawMessage =
+    parsed?.message ||
+    parsed?.error ||
+    parsed?.detail ||
+    parsed?.description ||
+    parsed?.title ||
+    parsed?.Message ||
+    text;
+
+  const message = getReadableMessage(rawMessage) || text || `HTTP ${status}`;
+  const normalized = message.toLowerCase();
+  const normalizedText = text.toLowerCase();
+  const isDuplicateEmail = normalized.includes("email already exists") ||
+    normalized.includes("email already registered") ||
+    normalized.includes("duplicate email") ||
+    normalized.includes("email đã tồn tại") ||
+    normalizedText.includes("email already exists") ||
+    normalizedText.includes("email already registered") ||
+    normalizedText.includes("duplicate email") ||
+    normalizedText.includes("email đã tồn tại");
+
+  if (endpoint.toLowerCase().endsWith("/register") && status === 500) {
+    if (isDuplicateEmail) {
+      return "Email đã tồn tại. Vui lòng dùng email khác hoặc đăng nhập.";
+    }
+    return message || "Đăng ký thất bại. Vui lòng kiểm tra lại thông tin và thử lại.";
+  }
+
+  return message || `HTTP ${status}`;
+}
+
 async function apiCall<T>(
   endpoint: string,
   options: RequestInit = {}
@@ -235,10 +306,12 @@ async function apiCall<T>(
     const text = await response.text();
 
     if (!response.ok) {
+      const message = extractServerMessage(endpoint, response.status, text);
+      const details = tryParseJson(text) ?? text;
       throw new ApiError(
         response.status,
-        text || response.statusText || `HTTP ${response.status}`,
-        text
+        message,
+        details
       );
     }
 
