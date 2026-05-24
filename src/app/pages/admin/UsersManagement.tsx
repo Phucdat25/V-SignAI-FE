@@ -1,6 +1,7 @@
 import { AdminLayout } from "../../components/AdminLayout";
-import { Search, Eye, Ban, Trash2, Download, Loader } from "lucide-react";
+import { Search, Eye, Ban, Trash2, Download, Loader, Plus } from "lucide-react";
 import { useState, useEffect } from "react";
+import { createAdminUser, AdminCreateUserRequest } from "../../api/admin-users";
 import {
   getAdminUsers,
   getAdminUserStatistics,
@@ -21,6 +22,28 @@ export function UsersManagement() {
   const [totalPages, setTotalPages] = useState(0);
   const [totalUsers, setTotalUsers] = useState(0);
   const [actionLoading, setActionLoading] = useState<number | null>(null);
+  const [isCreateUserModalOpen, setIsCreateUserModalOpen] = useState(false);
+
+   // Function fetch lại dữ liệu, dùng cho cả useEffect và sau khi tạo user
+  async function refreshUsers() {
+    setLoading(true);
+    try {
+      const statsData = await getAdminUserStatistics();
+      setStatistics(statsData);
+
+      const usersData = await getAdminUsers(currentPage, 10);
+      setUsers(usersData.content);
+      setTotalPages(usersData.totalPages);
+      setTotalUsers(usersData.totalElements);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Failed to fetch users data";
+      setError(errorMessage);
+      console.error("Error fetching users:", err);
+    } finally {
+      setLoading(false);
+    }
+  }
+
 
   // Fetch users and statistics
   useEffect(() => {
@@ -93,7 +116,7 @@ export function UsersManagement() {
         )}
 
         {/* Page Header */}
-        <div className="flex items-center justify-between">
+        {/* <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold" style={{ color: "#1F2937" }}>
               Quản lý người dùng
@@ -102,15 +125,154 @@ export function UsersManagement() {
               Quản lý và giám sát tất cả người dùng V-Sign AI
             </p>
           </div>
-          {/* <button
+           <button
             className="px-4 py-2 rounded-xl font-semibold text-sm flex items-center gap-2 hover:opacity-90 transition-all"
             style={{ backgroundColor: "#2563EB", color: "white" }}
           >
             <Download size={18} />
             Xuất dữ liệu
-          </button> */}
-        </div>
+          </button> 
 
+        </div> */}
+        {/* Page Header */}
+<div className="flex items-center justify-between">
+  <div>
+    <h1 className="text-2xl font-bold" style={{ color: "#1F2937" }}>
+      Quản lý người dùng
+    </h1>
+    <p className="text-sm mt-1" style={{ color: "#6B7280" }}>
+      Quản lý và giám sát tất cả người dùng V-Sign AI
+    </p>
+  </div>
+  <button
+    className="px-4 py-2 rounded-xl font-semibold text-sm flex items-center gap-2 hover:opacity-90 transition-all"
+    style={{ backgroundColor: "#2563EB", color: "white" }}
+    onClick={() => setIsCreateUserModalOpen(true)}
+  >
+    <Plus size={18} />
+    Tạo người dùng
+  </button>
+</div>
+{/* Popup tạo user */}
+{isCreateUserModalOpen && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+    <div
+      className="w-[400px] rounded-xl bg-white p-6 shadow-xl"
+      onClick={(e) => e.stopPropagation()} // Không đóng modal khi click vào form
+    >
+      <h3 className="text-lg font-semibold mb-4">Tạo người dùng mới</h3>
+
+      <form
+        onSubmit={async (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const email = formData.get("email") as string;
+    const name = formData.get("name") as string;
+    const planCode = formData.get("planCode") as string;
+    const role = formData.get("role") as string;
+    const password = formData.get("password") as string;
+    try {
+      const request: AdminCreateUserRequest = { email, name, planCode, role, password };
+      await createAdminUser(request);
+      await refreshUsers(); // refetch danh sách
+      setIsCreateUserModalOpen(false);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Tạo người dùng thất bại";
+      alert("Lỗi: " + message);
+    }}}
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="text-sm font-medium" style={{ color: "#1F2937" }}>
+              Tên người dùng
+            </label>
+            <input
+              type="text"
+              name="name"
+              required
+              className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
+              style={{ borderColor: "#e5e7eb", color: "#1F2937" }}
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium" style={{ color: "#1F2937" }}>
+              Email
+            </label>
+            <input
+              type="email"
+              name="email"
+              required
+              className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
+              style={{ borderColor: "#e5e7eb", color: "#1F2937" }}
+            />
+          </div>
+
+          <div>
+  <label className="text-sm font-medium" style={{ color: "#1F2937" }}>
+    Mật khẩu
+  </label>
+  <input
+    type="password"
+    name="password"
+    required
+    className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
+    style={{ borderColor: "#e5e7eb", color: "#1F2937" }}
+  />
+</div>
+
+          <div>
+            <label className="text-sm font-medium" style={{ color: "#1F2937" }}>
+              Gói
+            </label>
+            <select
+              name="planCode"
+              className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
+              style={{ borderColor: "#e5e7eb", color: "#1F2937" }}
+            >
+              <option value="">Chọn gói</option>
+              <option value="PRO_MONTH">Gói cao cấp tháng</option>
+              <option value="PRO_YEAR">Gói cao cấp năm</option>
+              <option value="FREE">Miễn phí</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="text-sm font-medium" style={{ color: "#1F2937" }}>
+              Role
+            </label>
+            <select
+              name="role"
+              className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
+              style={{ borderColor: "#e5e7eb", color: "#1F2937" }}
+            >
+              <option value="">Chọn role</option>
+              <option value="USER">USER</option>
+              <option value="ADMIN">ADMIN</option>
+            </select>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={() => setIsCreateUserModalOpen(false)}
+              className="px-4 py-2 rounded-lg border text-sm"
+              style={{ borderColor: "#e5e7eb", color: "#6B7280" }}
+            >
+              Hủy
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm"
+            >
+              Tạo
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+)}
         {/* Stats Summary */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="p-4 rounded-xl" style={{ backgroundColor: "white", border: "1px solid #e5e7eb" }}>
