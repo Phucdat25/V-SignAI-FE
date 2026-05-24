@@ -62,6 +62,25 @@ export interface ConversionRatePointResponse {
   conversionRate: number;
 }
 
+export interface WeeklyActivityResponse {
+  label: string;
+  users: number;
+  translations: number;
+}
+
+export interface MonthlyUserGrowthResponse {
+  month: string;
+  users: number;
+  premium: number;
+}
+
+// Backend returns { label, totalUsers, premiumUsers } — map to frontend shape
+export interface BackendMonthlyUserGrowthResponse {
+  label: string;
+  totalUsers: number;
+  premiumUsers: number;
+}
+
 export interface ApiResponse<T> {
   success: boolean;
   message?: string;
@@ -69,7 +88,7 @@ export interface ApiResponse<T> {
 }
 
 // ============ ADMIN USERS API ============
-import { get, patch } from "./client";
+import { get, patch, post } from "./client";
 
 export async function getAdminUserStatistics(): Promise<AdminUserStatisticsResponse> {
   const response = await get<ApiResponse<AdminUserStatisticsResponse>>("/api/admin/users/statistics");
@@ -102,6 +121,30 @@ export async function getAdminConversionRate(year?: number): Promise<ConversionR
   return response.data;
 }
 
+export async function getWeeklyActivity(): Promise<WeeklyActivityResponse[]> {
+  const response = await get<ApiResponse<WeeklyActivityResponse[]>>(
+    "/api/admin/users/weekly-activity"
+  );
+  return response.data;
+}
+
+export async function getMonthlyUserGrowth(year?: number): Promise<MonthlyUserGrowthResponse[]> {
+  const query: Record<string, string | number | boolean> = {};
+  if (year != null) query.year = year;
+
+  const response = await get<ApiResponse<BackendMonthlyUserGrowthResponse[]>>(
+    "/api/admin/users/monthly-user-growth",
+    { query }
+  );
+
+  // Map backend fields to frontend expected keys
+  return (response.data || []).map((r) => ({
+    month: r.label,
+    users: r.totalUsers ?? 0,
+    premium: r.premiumUsers ?? 0,
+  }));
+}
+
 export async function getAdminUsers(page: number = 0, size: number = 10): Promise<AdminUsersPageResponse> {
   const response = await get<ApiResponse<AdminUsersPageResponse>>("/api/admin/users", {
     query: { page, size },
@@ -118,5 +161,22 @@ export async function updateAdminUserStatus(id: number, status: string): Promise
   const response = await patch<ApiResponse<string>>(`/api/admin/users/${id}/status`, null, {
     query: { status },
   });
+  return response.data;
+}
+
+export interface AdminCreateUserRequest {
+  email: string;
+  name: string;
+  planCode: string;
+  role: string;
+  password: string;
+}
+export async function createAdminUser(
+  request: AdminCreateUserRequest
+): Promise<AdminUserResponse> {
+  const response = await post<ApiResponse<AdminUserResponse>>(
+    "/api/admin/users",
+    request
+  );
   return response.data;
 }
