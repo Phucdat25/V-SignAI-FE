@@ -1,7 +1,7 @@
 // ============ GENERIC API SERVICE ============
 import { ApiError } from "./auth";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080";
+const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL ?? "http://localhost:8080";
 
 function getAuthToken(): string | null {
   return localStorage.getItem("authToken");
