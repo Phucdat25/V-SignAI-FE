@@ -2,12 +2,15 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { Navbar } from "../components/Navbar";
 import { getUserInfo, formatUserPlan } from "../api";
+import { initiatePayment, redirectToVNPay } from "../api/payment";
 import { CheckCircle, X, Zap } from "lucide-react";
 
 export function Upgrade() {
   const navigate = useNavigate();
   const [upgraded, setUpgraded] = useState(false);
   const [currentPlan, setCurrentPlan] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const userInfo = getUserInfo();
@@ -19,9 +22,24 @@ export function Upgrade() {
   const isCurrentPlanProMonth = normalizedCurrentPlan.includes("PRO") && normalizedCurrentPlan.includes("MONTH");
   const isCurrentPlanProYear = normalizedCurrentPlan.includes("PRO") && normalizedCurrentPlan.includes("YEAR");
 
-  const handleUpgrade = () => {
-    setUpgraded(true);
-    setTimeout(() => navigate("/dashboard"), 2000);
+  const handleUpgrade = async (packageType: "PRO_MONTH" | "PRO_YEAR") => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const response = await initiatePayment(packageType);
+      
+      if (response.paymentUrl) {
+        // Redirect to VNPay
+        redirectToVNPay(response.paymentUrl);
+      } else {
+        setError("Không thể khởi tạo thanh toán. Vui lòng thử lại.");
+      }
+    } catch (err) {
+      console.error("Payment initiation error:", err);
+      setError(err instanceof Error ? err.message : "Có lỗi xảy ra. Vui lòng thử lại.");
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -55,6 +73,16 @@ export function Upgrade() {
           >
             <CheckCircle size={20} color="#16A34A" />
             <span style={{ color: "#15803d", fontWeight: 700 }}>🎉 Đã nâng cấp Premium! Đang chuyển về trang chủ...</span>
+          </div>
+        )}
+
+        {error && (
+          <div
+            className="rounded-2xl p-4 mb-8 flex items-center gap-3 justify-center"
+            style={{ backgroundColor: "#fef2f2", border: "1.5px solid #fca5a5" }}
+          >
+            <X size={20} color="#DC2626" />
+            <span style={{ color: "#991b1b", fontWeight: 700 }}>{error}</span>
           </div>
         )}
 
@@ -138,15 +166,22 @@ export function Upgrade() {
               ))}
 
               <button
-                onClick={handleUpgrade}
-                className="w-full mt-8 py-4 rounded-xl font-bold text-sm transition-all hover:opacity-90"
+                onClick={() => handleUpgrade("PRO_MONTH")}
+                disabled={isCurrentPlanProMonth || isLoading}
+                className="w-full mt-8 py-4 rounded-xl font-bold text-sm transition-all hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed"
                 style={{
                   backgroundColor: isCurrentPlanProMonth ? "#22c55e" : "white",
                   color: isCurrentPlanProMonth ? "white" : "#2563EB",
                   fontSize: 16,
                 }}
               >
-                {isCurrentPlanProMonth ? "Gói hiện tại" : upgraded ? "✓ Đã nâng cấp!" : "Nâng cấp ngay – 79.000₫/tháng"}
+                {isCurrentPlanProMonth 
+                  ? "Gói hiện tại" 
+                  : isLoading 
+                  ? "Đang xử lý..." 
+                  : upgraded 
+                  ? "✓ Đã nâng cấp!" 
+                  : "Nâng cấp ngay – 79.000₫/tháng"}
               </button>
               <p style={{ fontSize: 12, opacity: 0.6, textAlign: "center", marginTop: 12 }}>
                 Hủy bất cứ lúc nào · Không phí ẩn
@@ -187,15 +222,22 @@ export function Upgrade() {
               ))}
 
               <button
-                onClick={handleUpgrade}
-                className="w-full mt-20 py-4 rounded-xl font-bold text-sm transition-all hover:opacity-90"
+                onClick={() => handleUpgrade("PRO_YEAR")}
+                disabled={isCurrentPlanProYear || isLoading}
+                className="w-full mt-20 py-4 rounded-xl font-bold text-sm transition-all hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed"
                 style={{
                   backgroundColor: isCurrentPlanProYear ? "#22c55e" : "white",
                   color: isCurrentPlanProYear ? "white" : "#2563EB",
                   fontSize: 16,
                 }}
               >
-                {isCurrentPlanProYear ? "Gói hiện tại" : upgraded ? "✓ Đã nâng cấp!" : "Đăng ký năm – 799.000₫"}
+                {isCurrentPlanProYear 
+                  ? "Gói hiện tại" 
+                  : isLoading 
+                  ? "Đang xử lý..." 
+                  : upgraded 
+                  ? "✓ Đã nâng cấp!" 
+                  : "Đăng ký năm – 799.000₫"}
               </button>
               <p style={{ fontSize: 12, opacity: 0.6, textAlign: "center", marginTop: 12 }}>
                 Hủy bất cứ lúc nào · Tiết kiệm 89.000₫/năm
