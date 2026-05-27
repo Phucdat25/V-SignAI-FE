@@ -2,6 +2,22 @@ import { createBrowserRouter } from "react-router";
 import { Root } from "./Root";
 import { Landing } from "./pages/Landing";
 import { Login } from "./pages/Login";
+import { Register } from "./pages/Register";
+import { Dashboard } from "./pages/Dashboard";
+import { Conversation } from "./pages/Conversation";
+import { SignLibrary } from "./pages/SignLibrary";
+import { History } from "./pages/History";
+import { Upgrade } from "./pages/Upgrade";
+import { PaymentReturn } from "./pages/PaymentReturn";
+import { Profile } from "./pages/Profile";
+import { AdminDashboard } from "./pages/admin/AdminDashboard";
+import { UsersManagement } from "./pages/admin/UsersManagement";
+import { DatasetManagement } from "./pages/admin/DatasetManagement";
+import { Subscriptions } from "./pages/admin/Subscriptions";
+import { Translations } from "./pages/admin/Translations";
+import { Analytics } from "./pages/admin/Analytics";
+import { Settings } from "./pages/admin/Settings";
+
 async function handleResponse(response: Response) {
   const text = await response.text();
 
@@ -12,20 +28,7 @@ async function handleResponse(response: Response) {
   }
 
   return text;
-}import { Register } from "./pages/Register";
-import { Dashboard } from "./pages/Dashboard";
-import { Conversation } from "./pages/Conversation";
-import { SignLibrary } from "./pages/SignLibrary";
-import { History } from "./pages/History";
-import { Upgrade } from "./pages/Upgrade";
-import { Profile } from "./pages/Profile";
-import { AdminDashboard } from "./pages/admin/AdminDashboard";
-import { UsersManagement } from "./pages/admin/UsersManagement";
-import { DatasetManagement } from "./pages/admin/DatasetManagement";
-import { Subscriptions } from "./pages/admin/Subscriptions";
-import { Translations } from "./pages/admin/Translations";
-import { Analytics } from "./pages/admin/Analytics";
-import { Settings } from "./pages/admin/Settings";
+}
 
 export const router = createBrowserRouter([
   {
@@ -40,6 +43,7 @@ export const router = createBrowserRouter([
       { path: "signs", Component: SignLibrary },
       { path: "history", Component: History },
       { path: "upgrade", Component: Upgrade },
+      { path: "payment-return", Component: PaymentReturn },
       { path: "profile", Component: Profile },
       { path: "admin", Component: AdminDashboard },
       { path: "admin/users", Component: UsersManagement },
