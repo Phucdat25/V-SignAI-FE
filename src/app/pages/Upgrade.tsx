@@ -15,6 +15,11 @@ export function Upgrade() {
   useEffect(() => {
     const userInfo = getUserInfo();
     setCurrentPlan(userInfo?.plan || "FREE");
+    
+    // Reset state when component mounts (user navigates back)
+    setUpgraded(false);
+    setIsLoading(false);
+    setError(null);
   }, []);
 
   const normalizedCurrentPlan = currentPlan?.trim().toUpperCase() || "FREE";
