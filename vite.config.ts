@@ -20,7 +20,8 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'http://localhost:8080',
+        // target: 'http://localhost:8080',
+        target: 'https://vsign-ai-2wa69.ondigitalocean.app/',
         changeOrigin: true,
         secure: false,
       },
