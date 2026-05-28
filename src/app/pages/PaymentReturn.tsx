@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { Navbar } from "../components/Navbar";
 import { parseVNPayReturnParams, isPaymentSuccess, handleVNPayIPN } from "../api/payment";
+import { getProfile } from "../api/example";
+import { setUserInfo } from "../api/auth";
 import { CheckCircle, XCircle, Loader2 } from "lucide-react";
 
 export function PaymentReturn() {
@@ -41,6 +43,17 @@ export function PaymentReturn() {
             // Payment confirmed successfully
             setStatus("success");
             setMessage("Thanh toán thành công! Gói Premium của bạn đã được kích hoạt.");
+
+            // =====================================================
+            // STEP 4 — FETCH & UPDATE USER PROFILE
+            // =====================================================
+            try {
+              const updatedProfile = await getProfile();
+              console.log("Updated user profile after payment:", updatedProfile);
+              setUserInfo(updatedProfile);
+            } catch (profileError) {
+              console.warn("Failed to refresh user profile, but proceeding with redirect:", profileError);
+            }
 
             // Redirect to dashboard after 3 seconds
             setTimeout(() => {

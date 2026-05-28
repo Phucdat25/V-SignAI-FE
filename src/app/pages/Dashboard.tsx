@@ -7,6 +7,7 @@ import { getUserInfo, getTodayUsage, secondsToMinutes, getAuthToken } from "../a
 export function Dashboard() {
   const navigate = useNavigate();
   const [userName, setUserName] = useState("");
+  const [userPlan, setUserPlan] = useState<string | null>(null);
   const [usedMinutes, setUsedMinutes] = useState(0);
   const [limitMinutes, setLimitMinutes] = useState(0);
   const [remainingMinutes, setRemainingMinutes] = useState(0);
@@ -18,6 +19,7 @@ export function Dashboard() {
     if (user) {
       console.log("Dashboard - User Name:", user.name);
       setUserName(user.name || "User");
+      setUserPlan(user.plan || "FREE");
     } else {
       console.warn("Dashboard - No user info found in localStorage");
     }
@@ -98,44 +100,46 @@ export function Dashboard() {
           </div>
         </div>
 
-        {/* Sử dụng hôm nay */}
-        <div className="rounded-2xl p-6 mb-6 shadow-sm" style={{ backgroundColor: "white", border: "1px solid #e5e7eb" }}>
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <TrendingUp size={18} color="#2563EB" />
-              <h3 style={{ fontSize: 16, fontWeight: 700, color: "#1F2937" }}>Sử dụng hôm nay</h3>
+        {/* Sử dụng hôm nay - Only show for FREE plan */}
+        {(!userPlan || userPlan.toUpperCase() === "FREE") && (
+          <div className="rounded-2xl p-6 mb-6 shadow-sm" style={{ backgroundColor: "white", border: "1px solid #e5e7eb" }}>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <TrendingUp size={18} color="#2563EB" />
+                <h3 style={{ fontSize: 16, fontWeight: 700, color: "#1F2937" }}>Sử dụng hôm nay</h3>
+              </div>
+              <span className="px-3 py-1 rounded-full text-xs font-bold" style={{ backgroundColor: "#EFF6FF", color: "#2563EB" }}>
+                Gói miễn phí
+              </span>
             </div>
-            <span className="px-3 py-1 rounded-full text-xs font-bold" style={{ backgroundColor: "#EFF6FF", color: "#2563EB" }}>
-              Gói miễn phí
-            </span>
+            <div>
+              {loadingUsage ? (
+                <div style={{ fontSize: 14, color: "#6B7280" }}>Đang tải dữ liệu...</div>
+              ) : (
+                <>
+                  <div className="flex justify-between mb-2">
+                    <span style={{ fontSize: 14, color: "#374151" }}>Thời gian nhận diện</span>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: "#1F2937" }}>
+                      {usedMinutes} / {limitMinutes} phút
+                    </span>
+                  </div>
+                  <div className="w-full rounded-full h-3" style={{ backgroundColor: "#e5e7eb" }}>
+                    <div
+                      className="h-3 rounded-full transition-all"
+                      style={{
+                        width: `${limitMinutes > 0 ? (usedMinutes / limitMinutes) * 100 : 0}%`,
+                        background: "linear-gradient(90deg, #2563EB, #60a5fa)",
+                      }}
+                    />
+                  </div>
+                  <p style={{ fontSize: 12, color: "#6B7280", marginTop: 6 }}>
+                    Còn {remainingMinutes} phút hôm nay
+                  </p>
+                </>
+              )}
+            </div>
           </div>
-          <div>
-            {loadingUsage ? (
-              <div style={{ fontSize: 14, color: "#6B7280" }}>Đang tải dữ liệu...</div>
-            ) : (
-              <>
-                <div className="flex justify-between mb-2">
-                  <span style={{ fontSize: 14, color: "#374151" }}>Thời gian nhận diện</span>
-                  <span style={{ fontSize: 14, fontWeight: 700, color: "#1F2937" }}>
-                    {usedMinutes} / {limitMinutes} phút
-                  </span>
-                </div>
-                <div className="w-full rounded-full h-3" style={{ backgroundColor: "#e5e7eb" }}>
-                  <div
-                    className="h-3 rounded-full transition-all"
-                    style={{
-                      width: `${limitMinutes > 0 ? (usedMinutes / limitMinutes) * 100 : 0}%`,
-                      background: "linear-gradient(90deg, #2563EB, #60a5fa)",
-                    }}
-                  />
-                </div>
-                <p style={{ fontSize: 12, color: "#6B7280", marginTop: 6 }}>
-                  Còn {remainingMinutes} phút hôm nay
-                </p>
-              </>
-            )}
-          </div>
-        </div>
+        )}
 
         {/* Lối tắt */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
