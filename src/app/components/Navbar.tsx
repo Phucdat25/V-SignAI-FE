@@ -60,9 +60,9 @@ export function Navbar({ transparent = false }: NavbarProps) {
               <Link to="/conversation" className="text-sm" style={{ color: location.pathname === "/conversation" ? "#2563EB" : "#6B7280", fontWeight: location.pathname === "/conversation" ? 600 : 400 }}>
                 Hội thoại
               </Link>
-              <Link to="/signs" className="text-sm" style={{ color: location.pathname === "/signs" ? "#2563EB" : "#6B7280", fontWeight: location.pathname === "/signs" ? 600 : 400 }}>
+              {/* <Link to="/signs" className="text-sm" style={{ color: location.pathname === "/signs" ? "#2563EB" : "#6B7280", fontWeight: location.pathname === "/signs" ? 600 : 400 }}>
                 Ký hiệu
-              </Link>
+              </Link> */}
               <Link to="/history" className="text-sm" style={{ color: location.pathname === "/history" ? "#2563EB" : "#6B7280", fontWeight: location.pathname === "/history" ? 600 : 400 }}>
                 Lịch sử
               </Link>
@@ -98,7 +98,7 @@ export function Navbar({ transparent = false }: NavbarProps) {
               <>
                 <Link to="/dashboard" className="text-sm py-2" style={{ color: "#1F2937" }}>Trang chủ</Link>
                 <Link to="/conversation" className="text-sm py-2" style={{ color: "#1F2937" }}>Hội thoại</Link>
-                <Link to="/signs" className="text-sm py-2" style={{ color: "#1F2937" }}>Ký hiệu</Link>
+                {/* <Link to="/signs" className="text-sm py-2" style={{ color: "#1F2937" }}>Ký hiệu</Link> */}
                 <Link to="/history" className="text-sm py-2" style={{ color: "#1F2937" }}>Lịch sử</Link>
                 <Link to="/profile" className="text-sm py-2" style={{ color: "#1F2937" }}>Hồ sơ</Link>
               </>
