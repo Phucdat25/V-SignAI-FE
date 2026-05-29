@@ -46,11 +46,19 @@ export function Conversation() {
   const [signToTextError, setSignToTextError] = useState("");
   const [recognitionError, setRecognitionError] = useState("");
   const [isRecognitionSupported, setIsRecognitionSupported] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const [availableTime, setAvailableTime] = useState<number | null>(null);
+  const [isCheckingUsage, setIsCheckingUsage] = useState(false);
+  const [finalSentence, setFinalSentence] = useState("");
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const audioStreamRef = useRef<MediaStream | null>(null);
   const recognitionRef = useRef<any>(null);
+  const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const recordingStartTimeRef = useRef<number | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordedChunksRef = useRef<Blob[]>([]);
 
   const startCamera = async () => {
     try {
@@ -58,6 +66,28 @@ export function Conversation() {
       mediaStreamRef.current = stream;
       setCameraError("");
       setIsCameraActive(true);
+      
+      // Start recording video
+      recordedChunksRef.current = [];
+      const mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          recordedChunksRef.current.push(event.data);
+        }
+      };
+      mediaRecorder.start();
+      mediaRecorderRef.current = mediaRecorder;
+      
+      // Start recording timer
+      recordingStartTimeRef.current = Date.now();
+      setRecordingTime(0);
+      if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = setInterval(() => {
+        if (recordingStartTimeRef.current) {
+          const elapsed = Math.round((Date.now() - recordingStartTimeRef.current) / 1000);
+          setRecordingTime(elapsed);
+        }
+      }, 100);
     } catch (error) {
       console.error("Lỗi mở camera:", error);
       setCameraError("Không thể mở camera. Vui lòng kiểm tra quyền truy cập camera trên trình duyệt.");
@@ -69,12 +99,26 @@ export function Conversation() {
     if (isCameraActive && videoRef.current && mediaStreamRef.current) {
       videoRef.current.srcObject = mediaStreamRef.current;
       videoRef.current.play().catch((playError) => {
-        console.warn("Không thể tự động phát video camera:", playError);
+        // Suppress autoplay errors - not critical for recording
+        if (playError?.name !== 'AbortError') {
+          console.warn("Lỗi phát video:", playError);
+        }
       });
     }
   }, [isCameraActive]);
 
   const stopCamera = () => {
+    // Stop recording timer
+    if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+    recordingStartTimeRef.current = null;
+    setRecordingTime(0);
+    
+    // Stop media recorder
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+      mediaRecorderRef.current = null;
+    }
+    
     if (mediaStreamRef.current) {
       mediaStreamRef.current.getTracks().forEach((track) => track.stop());
       mediaStreamRef.current = null;
@@ -85,13 +129,52 @@ export function Conversation() {
     setIsCameraActive(false);
   };
 
-  const toggleCamera = () => {
+  const toggleCamera = async () => {
     if (isCameraActive) {
       stopCamera();
       setDetectedSignText("");
       setEditableText("");
+      setFinalSentence("");
     } else {
-      startCamera();
+      // Check usage quota before opening camera
+      setIsCheckingUsage(true);
+      setCameraError("");
+      try {
+        const usageData = await get<any>('/api/ai/usage/today');
+        console.log("[toggleCamera] usage data:", usageData);
+        
+        const usage = usageData?.data;
+
+        const remainingSeconds = Number(usage?.remainingSeconds);
+        const limitSeconds = Number(usage?.limitSeconds);
+
+        const isUnlimited = limitSeconds === -1 || remainingSeconds === -1;
+
+          if (isUnlimited) {
+            setAvailableTime(-1);
+            startCamera();
+            return;
+  }
+
+  if (remainingSeconds > 0) {
+    setAvailableTime(remainingSeconds);
+    startCamera();
+  } else {
+    setCameraError("Bạn đã hết thời gian sử dụng hôm nay. Vui lòng nâng cấp gói để tiếp tục.");
+    setAvailableTime(0);
+  }
+      } catch (error) {
+        console.error("Lỗi kiểm tra quota:", error);
+        setCameraError(
+          error instanceof ApiError
+            ? error.message
+            : error instanceof Error
+              ? error.message
+              : "Lỗi kiểm tra quota. Vui lòng thử lại."
+        );
+      } finally {
+        setIsCheckingUsage(false);
+      }
     }
   };
 
@@ -210,41 +293,90 @@ export function Conversation() {
 
   const startDetection = async () => {
     if (!isCameraActive) return;
-    if (!videoRef.current) return;
+    if (!mediaRecorderRef.current) return;
 
     setIsDetecting(true);
     setSignToTextError("");
 
-    const startTime = Date.now();
+    const durationSeconds = recordingTime || 1;
 
     try {
-      const video = videoRef.current;
-      const canvas = document.createElement("canvas");
-      canvas.width = video.videoWidth || 640;
-      canvas.height = video.videoHeight || 480;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) throw new Error("Không thể tạo canvas");
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const imageData = canvas.toDataURL("image/jpeg", 0.8);
+      // Stop the media recorder and wait for onstop event
+      await new Promise<void>((resolve) => {
+        if (mediaRecorderRef.current) {
+          const onStop = () => {
+            if (mediaRecorderRef.current) {
+              mediaRecorderRef.current.onstop = null;
+            }
+            resolve();
+          };
+          mediaRecorderRef.current.onstop = onStop;
+          if (mediaRecorderRef.current.state !== 'inactive') {
+            mediaRecorderRef.current.stop();
+          } else {
+            resolve();
+          }
+        } else {
+          resolve();
+        }
+      });
 
-      const usedSeconds = Math.max(1, Math.round((Date.now() - startTime) / 1000));
-      const response = await post<string>('/translate/sign-to-text', { image: imageData, usedSeconds });
-      const detected = response || "";
-      setDetectedSignText(detected);
-      setEditableText(detected);
+      // Small delay to ensure ondataavailable events are processed
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      if (recordedChunksRef.current.length === 0) {
+        throw new Error("Không có dữ liệu video được ghi lại. Vui lòng thử lại.");
+      }
+
+      const videoBlob = new Blob(recordedChunksRef.current, { type: 'video/webm' });
+      const formData = new FormData();
+      formData.append('file', videoBlob, 'recording.webm');
+      formData.append('durationSeconds', String(durationSeconds));
+
+      console.log("[startDetection] calling POST /api/ai/predict with video, durationSeconds:", durationSeconds);
+      
+      // Use fetch directly for multipart/form-data
+      const token = localStorage.getItem("authToken");
+      const apiBaseUrl = (import.meta as any).env?.VITE_API_BASE_URL ?? "http://localhost:8080";
+      const response = await fetch(`${apiBaseUrl}/api/ai/predict`, {
+        method: 'POST',
+        headers: {
+          ...(token && { 'Authorization': `Bearer ${token}` })
+        },
+        body: formData
+      });
+
+      if (!response.ok) {
+        throw new Error(`API error: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      console.log("[startDetection] response:", result);
+
+      // Extract finalSentence from response - try multiple key paths
+      const finalSentence = result?.data?.final_sentence || result?.data?.finalSentence || result?.finalSentence || result?.final_sentence || result?.sentence || "";
+      
+      if (!finalSentence) {
+        throw new Error("API không trả về kết quả nhận dạng. Vui lòng thử lại.");
+      }
+      
+      setFinalSentence(finalSentence);
+      setDetectedSignText(finalSentence);
+      setEditableText(finalSentence);
     } catch (error) {
-      console.error("Lỗi API sign-to-text:", error);
+      console.error("Lỗi API predict:", error);
       setSignToTextError(
-        error instanceof ApiError
+        error instanceof Error
           ? error.message
-          : error instanceof Error
-            ? error.message
-            : "Lỗi nhận dạng ký hiệu. Vui lòng thử lại."
+          : "Lỗi nhận dạng ký hiệu. Vui lòng thử lại."
       );
       setDetectedSignText("");
       setEditableText("");
+      setFinalSentence("");
     } finally {
       setIsDetecting(false);
+      // Stop camera after detection to save resources
+      stopCamera();
     }
   };
 
@@ -335,6 +467,10 @@ export function Conversation() {
 
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
+      if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop();
+      }
       if (mediaStreamRef.current) {
         mediaStreamRef.current.getTracks().forEach((track) => track.stop());
       }
@@ -585,6 +721,13 @@ export function Conversation() {
                     <span style={{ color: "white", fontSize: 12, fontWeight: 700 }}>LIVE</span>
                   </div>
 
+                  <div className="absolute top-4 right-4 px-3 py-2 rounded-lg" style={{ backgroundColor: "rgba(0, 0, 0, 0.7)" }}>
+                    <span style={{ color: "white", fontSize: 12, fontWeight: 700 }}>
+                      ⏱️ {recordingTime}s
+                      {availableTime !== null && ` / ${availableTime}s`}
+                    </span>
+                  </div>
+
                   {isDetecting && (
                     <div className="absolute inset-0 flex items-center justify-center" style={{ backgroundColor: "rgba(22, 163, 74, 0.2)" }}>
                       <div className="text-center">
@@ -615,15 +758,16 @@ export function Conversation() {
             <div className="grid grid-cols-2 gap-3 mb-4">
               <button
                 onClick={toggleCamera}
-                className="py-3 rounded-xl font-bold transition-all hover:opacity-90 shadow-md flex items-center justify-center gap-2"
+                disabled={isCheckingUsage}
+                className="py-3 rounded-xl font-bold transition-all hover:opacity-90 shadow-md flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{ 
                   backgroundColor: isCameraActive ? "#DC2626" : "#16A34A",
                   color: "white",
                   fontSize: 14
                 }}
               >
-                {isCameraActive ? <CameraOff size={18} /> : <Camera size={18} />}
-                {isCameraActive ? "Tắt Camera" : "Bật Camera"}
+                {isCheckingUsage ? <RotateCcw size={18} className="animate-spin" /> : (isCameraActive ? <CameraOff size={18} /> : <Camera size={18} />)}
+                {isCheckingUsage ? "Đang kiểm tra..." : (isCameraActive ? "Tắt Camera" : "Bật Camera")}
               </button>
 
               <button
@@ -644,11 +788,16 @@ export function Conversation() {
             {cameraError && (
               <div className="mb-4 rounded-2xl p-4" style={{ backgroundColor: "#FEE2E2", border: "2px solid #FCA5A5" }}>
                 <p style={{ fontSize: 14, fontWeight: 700, color: "#B91C1C" }}>
-                  Lỗi camera
+                  ⚠️ Lỗi camera
                 </p>
                 <p style={{ fontSize: 13, color: "#991B1B", marginTop: 4 }}>
                   {cameraError}
                 </p>
+                {availableTime === 0 && (
+                  <p style={{ fontSize: 12, color: "#B91C1C", marginTop: 6 }}>
+                    💡 Để tiếp tục sử dụng, vui lòng nâng cấp gói của bạn.
+                  </p>
+                )}
               </div>
             )}
 
@@ -664,22 +813,19 @@ export function Conversation() {
             )}
 
             {/* Detection Output */}
-            {detectedSignText && (
+            {finalSentence && (
               <div className="mb-4 rounded-2xl p-4" style={{ backgroundColor: "#F0FDF4", border: "2px solid #BBF7D0" }}>
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="w-2 h-2 rounded-full bg-green-500" />
-                  <span style={{ fontSize: 12, fontWeight: 700, color: "#16A34A", textTransform: "uppercase" }}>
-                    Văn bản nhận dạng
-                  </span>
-                </div>
-                <p style={{ fontSize: 20, fontWeight: 700, color: "#1F2937" }}>
-                  {detectedSignText}
+                <p style={{ fontSize: 11, fontWeight: 600, color: "#16A34A", marginBottom: 4, textTransform: "uppercase" }}>
+                  ✨ Câu hoàn chỉnh:
+                </p>
+                <p style={{ fontSize: 16, fontWeight: 700, color: "#059669" }}>
+                  {finalSentence}
                 </p>
               </div>
             )}
 
             {/* Editable Text */}
-            <textarea
+            {/* <textarea
               value={editableText}
               onChange={(e) => setEditableText(e.target.value)}
               placeholder="Văn bản nhận dạng sẽ hiển thị ở đây và có thể chỉnh sửa..."
@@ -693,7 +839,7 @@ export function Conversation() {
               }}
               onFocus={(e) => (e.currentTarget.style.borderColor = "#16A34A")}
               onBlur={(e) => (e.currentTarget.style.borderColor = "#e5e7eb")}
-            />
+            /> */}
 
             {/* Play Voice Button */}
             <button
