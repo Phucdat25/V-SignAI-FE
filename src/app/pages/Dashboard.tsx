@@ -2,15 +2,15 @@ import { useNavigate } from "react-router";
 import { useEffect, useState } from "react";
 import { Navbar } from "../components/Navbar";
 import { MessageSquare, BookOpen, History, Zap, Mic, TrendingUp, Bell } from "lucide-react";
-import { getUserInfo, getTodayUsage, secondsToMinutes, getAuthToken } from "../api";
+import { getUserInfo, getTodayUsage, getAuthToken } from "../api";
 
 export function Dashboard() {
   const navigate = useNavigate();
   const [userName, setUserName] = useState("");
   const [userPlan, setUserPlan] = useState<string | null>(null);
-  const [usedMinutes, setUsedMinutes] = useState(0);
-  const [limitMinutes, setLimitMinutes] = useState(0);
-  const [remainingMinutes, setRemainingMinutes] = useState(0);
+  const [usedSeconds, setUsedSeconds] = useState(0);
+  const [limitSeconds, setLimitSeconds] = useState(0);
+  const [remainingSeconds, setRemainingSeconds] = useState(0);
   const [loadingUsage, setLoadingUsage] = useState(true);
 
   useEffect(() => {
@@ -33,9 +33,9 @@ export function Dashboard() {
         
         if (!token) {
           console.warn("Dashboard - No auth token available, skipping usage fetch");
-          setUsedMinutes(0);
-          setLimitMinutes(5);
-          setRemainingMinutes(5);
+          setUsedSeconds(0);
+          setLimitSeconds(180);
+          setRemainingSeconds(180);
           setLoadingUsage(false);
           return;
         }
@@ -43,19 +43,15 @@ export function Dashboard() {
         const usage = await getTodayUsage();
         console.log("Dashboard - Usage Data:", usage);
         
-        const used = secondsToMinutes(usage.usedSeconds);
-        const limit = secondsToMinutes(usage.limitSeconds);
-        const remaining = secondsToMinutes(usage.remainingSeconds);
-        
-        setUsedMinutes(used);
-        setLimitMinutes(limit);
-        setRemainingMinutes(remaining);
+        setUsedSeconds(usage.usedSeconds);
+        setLimitSeconds(usage.limitSeconds);
+        setRemainingSeconds(usage.remainingSeconds);
       } catch (error) {
         console.error("Dashboard - Error fetching usage:", error);
         // Fallback values if API fails
-        setUsedMinutes(0);
-        setLimitMinutes(5);
-        setRemainingMinutes(5);
+        setUsedSeconds(0);
+        setLimitSeconds(180);
+        setRemainingSeconds(180);
       } finally {
         setLoadingUsage(false);
       }
@@ -120,20 +116,20 @@ export function Dashboard() {
                   <div className="flex justify-between mb-2">
                     <span style={{ fontSize: 14, color: "#374151" }}>Thời gian nhận diện</span>
                     <span style={{ fontSize: 14, fontWeight: 700, color: "#1F2937" }}>
-                      {usedMinutes} / {limitMinutes} phút
+                      {usedSeconds} / {limitSeconds} giây
                     </span>
                   </div>
                   <div className="w-full rounded-full h-3" style={{ backgroundColor: "#e5e7eb" }}>
                     <div
                       className="h-3 rounded-full transition-all"
                       style={{
-                        width: `${limitMinutes > 0 ? (usedMinutes / limitMinutes) * 100 : 0}%`,
+                        width: `${limitSeconds > 0 ? (usedSeconds / limitSeconds) * 100 : 0}%`,
                         background: "linear-gradient(90deg, #2563EB, #60a5fa)",
                       }}
                     />
                   </div>
                   <p style={{ fontSize: 12, color: "#6B7280", marginTop: 6 }}>
-                    Còn {remainingMinutes} phút hôm nay
+                    Còn {remainingSeconds} giây hôm nay
                   </p>
                 </>
               )}
