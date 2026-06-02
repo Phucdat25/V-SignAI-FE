@@ -48,7 +48,7 @@ export function Landing() {
               </p>
               <div className="flex flex-wrap gap-4">
                 <button
-                  onClick={() => navigate("/dashboard")}
+                  onClick={() => navigate("/login")}
                   className="px-8 py-4 rounded-xl text-base shadow-lg hover:opacity-90 transition-all"
                   style={{ backgroundColor: "white", color: "#2563EB", fontWeight: 700 }}
                 >Bắt đầu</button>
