@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Navbar } from "../components/Navbar";
+import { RecentConversations } from "../components/RecentConversations";
 import { get, post } from "../api/client";
 import { ApiError } from "../api";
 import { Mic, MicOff, Volume2, Camera, CameraOff, Hand, Send, RotateCcw, User, MessageSquare } from "lucide-react";
@@ -180,6 +181,11 @@ export function Conversation() {
 
   // Conversation history
   const [messages, setMessages] = useState<MessageType[]>([]);
+  const [recentHistoryRefreshKey, setRecentHistoryRefreshKey] = useState(0);
+
+  const refreshRecentHistory = () => {
+    setRecentHistoryRefreshKey((key) => key + 1);
+  };
   const [isSpeaking, setIsSpeaking] = useState(false);
 
   const demoSpeechIndex = useRef(0);
@@ -275,6 +281,7 @@ export function Conversation() {
         timestamp: new Date(),
       };
       setMessages(prev => [...prev, newMessage]);
+      refreshRecentHistory();
     } catch (error) {
       console.error("Lỗi API text-to-sign:", error);
       setSignAnimation("");
@@ -328,6 +335,18 @@ export function Conversation() {
         throw new Error("Không có dữ liệu video được ghi lại. Vui lòng thử lại.");
       }
 
+      // Tắt camera ngay sau khi ghi xong — không chờ API predict
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks().forEach((track) => track.stop());
+        mediaStreamRef.current = null;
+      }
+      if (videoRef.current) {
+        videoRef.current.srcObject = null;
+      }
+      if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+      recordingStartTimeRef.current = null;
+      setIsCameraActive(false);
+
       const videoBlob = new Blob(recordedChunksRef.current, { type: 'video/webm' });
       const formData = new FormData();
       formData.append('file', videoBlob, 'recording.webm');
@@ -363,6 +382,7 @@ export function Conversation() {
       setFinalSentence(finalSentence);
       setDetectedSignText(finalSentence);
       setEditableText(finalSentence);
+      refreshRecentHistory();
     } catch (error) {
       console.error("Lỗi API predict:", error);
       setSignToTextError(
@@ -375,8 +395,10 @@ export function Conversation() {
       setFinalSentence("");
     } finally {
       setIsDetecting(false);
-      // Stop camera after detection to save resources
-      stopCamera();
+      // Dọn dẹp nếu camera vẫn còn bật (lỗi trước khi tắt preview)
+      if (mediaStreamRef.current || mediaRecorderRef.current) {
+        stopCamera();
+      }
     }
   };
 
@@ -885,84 +907,11 @@ export function Conversation() {
           </div>
         </div> */}
 
-        {/* CONVERSATION HISTORY */}
-        <div className="rounded-3xl p-6 shadow-lg" style={{ backgroundColor: "white" }}>
-          <h3 style={{ fontSize: 18, fontWeight: 700, color: "#1F2937", marginBottom: 16 }}>
-            📜 Lịch sử hội thoại
-          </h3>
-          
-          {messages.length === 0 ? (
-            <div className="text-center py-12">
-              <MessageSquare size={48} color="#D1D5DB" className="mx-auto mb-3" />
-              <p style={{ fontSize: 14, color: "#9CA3AF" }}>
-                Chưa có hội thoại nào. Bắt đầu giao tiếp ngay!
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-4 max-h-96 overflow-y-auto">
-              {messages.map((msg) => (
-                <div
-                  key={msg.id}
-                  className="rounded-2xl p-4 transition-all hover:shadow-md"
-                  style={{ 
-                    backgroundColor: msg.type === "voice" ? "#EFF6FF" : "#F0FDF4",
-                    border: "2px solid",
-                    borderColor: msg.type === "voice" ? "#BFDBFE" : "#BBF7D0"
-                  }}
-                >
-                  <div className="flex items-start justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <div 
-                        className="w-8 h-8 rounded-lg flex items-center justify-center"
-                        style={{ backgroundColor: msg.type === "voice" ? "#2563EB" : "#16A34A" }}
-                      >
-                        {msg.type === "voice" ? (
-                          <User size={16} color="white" />
-                        ) : (
-                          <Hand size={16} color="white" />
-                        )}
-                      </div>
-                      <div>
-                        <p style={{ fontSize: 12, fontWeight: 700, color: msg.type === "voice" ? "#2563EB" : "#16A34A" }}>
-                          {msg.type === "voice" ? "NGƯỜI NGHE" : "NGƯỜI KHIẾM THÍNH"}
-                        </p>
-                        <p style={{ fontSize: 10, color: "#9CA3AF" }}>
-                          {msg.timestamp.toLocaleTimeString("vi-VN")}
-                        </p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => replayMessage(msg)}
-                      className="p-2 rounded-lg transition-all hover:bg-white"
-                      style={{ color: "#6B7280" }}
-                    >
-                      <RotateCcw size={16} />
-                    </button>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <div>
-                      <p style={{ fontSize: 11, fontWeight: 600, color: "#6B7280", marginBottom: 4 }}>
-                        Đầu vào:
-                      </p>
-                      <p style={{ fontSize: 15, color: "#1F2937" }}>
-                        {msg.original}
-                      </p>
-                    </div>
-                    <div className="pt-2" style={{ borderTop: "1px dashed #E5E7EB" }}>
-                      <p style={{ fontSize: 11, fontWeight: 600, color: "#6B7280", marginBottom: 4 }}>
-                        Dịch sang:
-                      </p>
-                      <p style={{ fontSize: 15, color: "#1F2937", fontWeight: 600 }}>
-                        {msg.translated}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        <RecentConversations
+          title="📜 Lịch sử hội thoại"
+          variant="conversation"
+          refreshKey={recentHistoryRefreshKey}
+        />
       </div>
     </div>
   );

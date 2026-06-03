@@ -171,6 +171,40 @@ export function syncAdminAuth(role?: UserRole): void {
   }
 }
 
+const PRO_MONTH_PLANS = [
+  "PRO_MONTHLY",
+  "PRO_MONTH",
+  "PRO_MONTHLY_PLAN",
+  "PROMONTHLY",
+];
+
+const PRO_YEAR_PLANS = [
+  "PRO_YEARLY",
+  "PRO_YEAR",
+  "PRO_YEARLY_PLAN",
+  "PROYEARLY",
+];
+
+export function isFreePlan(plan?: string): boolean {
+  if (!plan) return true;
+  const normalized = plan.trim().toUpperCase();
+  if (["FREE", "FREE_PLAN", "PRO_FREE"].includes(normalized)) return true;
+  return normalized.includes("FREE");
+}
+
+export function isProPlan(plan?: string): boolean {
+  if (!plan || isFreePlan(plan)) return false;
+
+  const normalized = plan.trim().toUpperCase();
+  if (PRO_MONTH_PLANS.includes(normalized) || PRO_YEAR_PLANS.includes(normalized)) {
+    return true;
+  }
+  if (normalized === "PRO" || normalized === "CASH") return true;
+
+  const lower = plan.toLowerCase();
+  return lower.includes("month") || lower.includes("year");
+}
+
 export function formatUserPlan(plan?: string): string {
   if (!plan) return "Gói miễn phí";
 

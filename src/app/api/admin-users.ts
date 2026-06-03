@@ -81,14 +81,11 @@ export interface BackendMonthlyUserGrowthResponse {
   premiumUsers: number;
 }
 
-export interface ApiResponse<T> {
-  success: boolean;
-  message?: string;
-  data: T;
-}
+export type { ApiResponse } from "./types";
 
 // ============ ADMIN USERS API ============
 import { get, patch, post } from "./client";
+import type { ApiResponse } from "./types";
 
 export async function getAdminUserStatistics(): Promise<AdminUserStatisticsResponse> {
   const response = await get<ApiResponse<AdminUserStatisticsResponse>>("/api/admin/users/statistics");

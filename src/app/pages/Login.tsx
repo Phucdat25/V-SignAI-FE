@@ -36,8 +36,8 @@ interface GoogleButtonConfig {
   text?: 'signin_with' | 'signup_with' | 'continue_with' | 'signup_with';
 }
 
-const logoImg = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='50' fill='%232563EB'/%3E%3C/svg%3E";
-
+const logoImg =
+  "https://res.cloudinary.com/dinw9zchn/image/upload/v1780503696/z7897842107211_8ae108e28ddcd9595e1991d52dde7862_gwhpti.jpg";
 export function Login() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -172,8 +172,8 @@ export function Login() {
             <img 
               src={logoImg} 
               alt="V-Sign AI Logo" 
-              className="h-12 w-12 object-contain"
-            />
+              className="h-10 w-10 rounded-full object-cover"
+              />
             <span style={{ fontSize: 26, fontWeight: 800, color: "#1F2937" }}>V-Sign AI</span>
           </Link>
           <p className="mt-2" style={{ color: "#6B7280", fontSize: 15 }}>Chào mừng trở lại! Đăng nhập để tiếp tục.</p>

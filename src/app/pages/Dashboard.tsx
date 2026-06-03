@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router";
 import { useEffect, useState } from "react";
 import { Navbar } from "../components/Navbar";
+import { RecentConversations } from "../components/RecentConversations";
 import { MessageSquare, BookOpen, History, Zap, Mic, TrendingUp, Bell } from "lucide-react";
 import { getUserInfo, getTodayUsage, getAuthToken } from "../api";
 
@@ -159,28 +160,7 @@ export function Dashboard() {
           ))}
         </div>
 
-        {/* Hoạt động gần đây */}
-        <div className="rounded-2xl p-6 mt-6 shadow-sm" style={{ backgroundColor: "white", border: "1px solid #e5e7eb" }}>
-          <h3 style={{ fontSize: 16, fontWeight: 700, color: "#1F2937", marginBottom: 16 }}>Hội thoại gần đây</h3>
-          {[
-            { date: "Hôm nay, 09:45", preview: "Xin chào, tôi cần khám bệnh hôm nay..." },
-            { date: "Hôm qua, 15:12", preview: "Bạn có thể giúp tôi không?" },
-            { date: "01/03, 11:30", preview: "Tôi muốn đặt bàn ăn cho hai người..." },
-          ].map((item) => (
-            <div
-              key={item.date}
-              className="flex items-center justify-between py-3 border-b last:border-b-0 cursor-pointer hover:bg-gray-50 rounded-lg px-2 -mx-2 transition-colors"
-              style={{ borderColor: "#f3f4f6" }}
-              onClick={() => navigate("/history")}
-            >
-              <div>
-                <p style={{ fontSize: 13, color: "#6B7280" }}>{item.date}</p>
-                <p style={{ fontSize: 14, color: "#374151", marginTop: 2 }}>{item.preview}</p>
-              </div>
-              <span style={{ fontSize: 12, color: "#2563EB" }}>Xem →</span>
-            </div>
-          ))}
-        </div>
+        <RecentConversations title="Hội thoại gần đây" variant="dashboard" />
       </div>
     </div>
   );

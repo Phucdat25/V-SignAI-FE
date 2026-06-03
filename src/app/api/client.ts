@@ -32,9 +32,6 @@ export async function apiRequest<T>(
   const token = getAuthToken();
   if (token) {
     headers["Authorization"] = `Bearer ${token}`;
-    console.log("API Request - Adding Authorization header with token:", token.substring(0, 20) + "...");
-  } else {
-    console.warn("API Request - No auth token found in localStorage");
   }
 
   // Merge additional headers safely (this can override Authorization if needed)
@@ -53,8 +50,6 @@ export async function apiRequest<T>(
   }
 
   try {
-    console.log("API Request - URL:", url.toString());
-    console.log("API Request - Headers:", headers);
     const response = await fetch(url.toString(), {
       ...fetchOptions,
       headers,
