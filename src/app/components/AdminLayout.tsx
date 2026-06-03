@@ -3,8 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router";
 import {
   LayoutDashboard,
   Users,
-  Database,
-  Languages,
+  History,
   BarChart3,
   CreditCard,
   Settings,
@@ -26,7 +25,7 @@ const menuItems = [
   { icon: LayoutDashboard, label: "Tổng quan", path: "/admin" },
   { icon: Users, label: "Quản lý người dùng", path: "/admin/users" },
   // { icon: Database, label: "Dữ liệu ngôn ngữ ký hiệu", path: "/admin/dataset" },
-  // { icon: Languages, label: "Dịch thuật", path: "/admin/translations" },
+  { icon: History, label: "Lịch sử", path: "/admin/translations" },
   { icon: BarChart3, label: "Phân tích", path: "/admin/analytics" },
   { icon: CreditCard, label: "Gói đăng ký", path: "/admin/subscriptions" },
   { icon: Settings, label: "Cài đặt", path: "/admin/settings" },

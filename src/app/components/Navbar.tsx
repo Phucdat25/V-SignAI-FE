@@ -2,8 +2,8 @@ import { useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router";
 import { Menu, X } from "lucide-react";
 
-const image_6bcfb9ad6a37e4385292e31219fa90429f4d1bd0 = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='50' fill='%232563EB'/%3E%3C/svg%3E";
-
+const image_6bcfb9ad6a37e4385292e31219fa90429f4d1bd0 =
+  "https://res.cloudinary.com/dinw9zchn/image/upload/v1780503696/z7897842107211_8ae108e28ddcd9595e1991d52dde7862_gwhpti.jpg";
 interface NavbarProps {
   transparent?: boolean;
 }
@@ -26,7 +26,7 @@ export function Navbar({ transparent = false }: NavbarProps) {
             <img 
               src={image_6bcfb9ad6a37e4385292e31219fa90429f4d1bd0} 
               alt="V-Sign AI Logo" 
-              className="h-10 w-10 object-contain"
+              className="h-10 w-10 rounded-full object-cover"
             />
             <span className="text-xl" style={{ color: transparent ? "white" : "#1F2937", fontWeight: 700 }}>V-Sign AI</span>
           </Link>
@@ -43,7 +43,7 @@ export function Navbar({ transparent = false }: NavbarProps) {
                 Đăng nhập
               </Link>
               <button
-                onClick={() => navigate("/dashboard")}
+                onClick={() => navigate("/login")}
                 className="px-5 py-2 rounded-xl text-white text-sm shadow-md hover:opacity-90 transition-all"
                 style={{ backgroundColor: "#2563EB" }}
               >

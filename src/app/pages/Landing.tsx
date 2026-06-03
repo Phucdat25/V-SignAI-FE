@@ -2,10 +2,11 @@ import { useNavigate } from "react-router";
 import { Navbar } from "../components/Navbar";
 import { Mic, Hand, Sparkles, Volume2, Zap, BookOpen, CheckCircle, Star, ArrowRight, Building2, School, Landmark } from "lucide-react";
 
-const logoImg = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='50' fill='%232563EB'/%3E%3C/svg%3E";
+const logoImg =
+  "https://res.cloudinary.com/dinw9zchn/image/upload/v1780503696/z7897842107211_8ae108e28ddcd9595e1991d52dde7862_gwhpti.jpg";
 
-const heroImg = "https://images.unsplash.com/photo-1662580946467-9279de61ed99?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxkZWFmJTIwY29tbXVuaWNhdGlvbiUyMHNpZ24lMjBsYW5ndWFnZXxlbnwxfHx8fDE3NzI1NDQ0MzZ8MA&ixlib=rb-4.1.0&q=80&w=1080";
-const speechImg = "https://images.unsplash.com/photo-1761311984305-8cdd650d5b26?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxzcGVlY2glMjByZWNvZ25pdGlvbiUyMHZvaWNlJTIwdGVjaG5vbG9neXxlbnwxfHx8fDE3NzI1NDQ0Mzh8MA&ixlib=rb-4.1.0&q=80&w=1080";
+const heroImg =
+  "https://res.cloudinary.com/dinw9zchn/image/upload/v1780503696/z7897842107211_8ae108e28ddcd9595e1991d52dde7862_gwhpti.jpg";
 
 export function Landing() {
   const navigate = useNavigate();
@@ -380,8 +381,8 @@ export function Landing() {
           <img 
             src={logoImg} 
             alt="V-Sign AI Logo" 
-            className="h-10 w-10 object-contain"
-          />
+            className="h-10 w-10 rounded-full object-cover"
+            />
           <span style={{ color: "white", fontWeight: 700, fontSize: 18 }}>V-Sign AI</span>
         </div>
         <p style={{ color: "#9CA3AF", fontSize: 14 }}>© 2026 V-Sign AI. Hỗ trợ cộng đồng người khiếm thính tại Việt Nam 🇻🇳</p>

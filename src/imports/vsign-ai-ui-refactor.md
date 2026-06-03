@@ -7,11 +7,11 @@ PRICING SECTION FIX
 There are three pricing cards:
 
 1. Free Plan
-2. Pro Plan (49.000đ / month)
-3. Annual Plan (499.000đ / year)
+2. Pro Plan (779.000đ / month)
+3. Annual Plan (7799.000đ / year)
 
 Issue:
-The button "Đăng ký năm – 499.000đ" is placed higher than the other CTA buttons.
+The button "Đăng ký năm – 7799.000đ" is placed higher than the other CTA buttons.
 
 Fix:
 - Align all CTA buttons horizontally at the bottom of the pricing cards.
