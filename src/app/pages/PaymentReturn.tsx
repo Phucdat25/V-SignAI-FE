@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { Navbar } from "../components/Navbar";
 import { parseVNPayReturnParams, isPaymentSuccess, handleVNPayIPN } from "../api/payment";
-import { getProfile } from "../api/example";
-import { setUserInfo } from "../api/auth";
+import { getSubscriptionStatus, getProfile } from "../api/example";
+import { getUserInfo, setUserInfo } from "../api/auth";
 import { CheckCircle, XCircle, Loader2 } from "lucide-react";
 
 export function PaymentReturn() {
@@ -70,29 +70,62 @@ export function PaymentReturn() {
             setMessage("Thanh toán thành công! Gói Premium của bạn đã được kích hoạt.");
 
             // =====================================================
-            // STEP 4 — FETCH & UPDATE USER PROFILE
+            // STEP 4 — FETCH & UPDATE USER SUBSCRIPTION STATUS
             // =====================================================
-            const fetchProfileWithRetry = async (retries = 3, delay = 1000) => {
+            const fetchUpdatedUserInfoWithRetry = async (retries = 3, delay = 1000) => {
               for (let i = 0; i < retries; i++) {
                 try {
                   // Add delay before each attempt (give backend time to process)
                   await new Promise(resolve => setTimeout(resolve, delay));
                   
-                  const updatedProfile = await getProfile();
-                  console.log("Updated user profile after payment:", updatedProfile);
-                  setUserInfo(updatedProfile);
-                  return true; // Success
-                } catch (error) {
-                  console.warn(`Profile fetch attempt ${i + 1} failed:`, error);
-                  if (i === retries - 1) {
-                    console.warn("Failed to refresh user profile after all retries, but proceeding with redirect");
-                    return false;
+                  let updatedData = null;
+                  
+                  // Try to get subscription status first (new endpoint)
+                  try {
+                    const subscription = await getSubscriptionStatus();
+                    console.log("Got subscription status:", subscription);
+                    if (subscription && subscription.plan) {
+                      updatedData = subscription;
+                    }
+                  } catch (subError) {
+                    console.warn("Subscription status endpoint failed, trying profile endpoint:", subError);
+                    // Fallback to profile endpoint
+                    try {
+                      const profile = await getProfile();
+                      console.log("Got profile:", profile);
+                      if (profile && profile.plan) {
+                        updatedData = profile;
+                      }
+                    } catch (profileError) {
+                      console.warn("Profile endpoint also failed:", profileError);
+                    }
                   }
+                  
+                  // Update user info if we got new data with plan
+                  if (updatedData && updatedData.plan) {
+                    const currentUser = getUserInfo();
+                    if (currentUser) {
+                      setUserInfo({
+                        ...currentUser,
+                        plan: updatedData.plan,
+                      });
+                      console.log("User info updated with new plan:", updatedData.plan);
+                      return true;
+                    }
+                  }
+                } catch (error) {
+                  console.warn(`User info fetch attempt ${i + 1} failed:`, error);
                 }
               }
+              
+              // Even if all retries failed, payment is confirmed, so we can proceed
+              console.warn("Failed to fetch updated user info after all retries, but payment is confirmed");
+              return false;
             };
 
-            await fetchProfileWithRetry();
+            // Try to fetch updated user info, but don't block if it fails
+            // Payment is already confirmed by IPN, so we proceed regardless
+            await fetchUpdatedUserInfoWithRetry();
 
             // Redirect to dashboard after 2 seconds
             // (Don't reload page to avoid calling handleVNPayIPN again)

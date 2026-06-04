@@ -44,6 +44,19 @@ export async function changePassword(data: ChangePasswordRequest): Promise<{ mes
   return post("/user/change-password", data);
 }
 
+// ============ SUBSCRIPTION API ============
+
+export interface SubscriptionStatus {
+  plan?: string;
+  planName?: string;
+  planCode?: string;
+  expiresAt?: string;
+}
+
+export async function getSubscriptionStatus(): Promise<SubscriptionStatus> {
+  return get<SubscriptionStatus>("/api/subscription/status");
+}
+
 // ============ EXAMPLE: CONVERSATION API ============
 
 export interface Message {
