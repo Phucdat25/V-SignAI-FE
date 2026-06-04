@@ -70,62 +70,43 @@ export function PaymentReturn() {
             setMessage("Thanh toán thành công! Gói Premium của bạn đã được kích hoạt.");
 
             // =====================================================
-            // STEP 4 — FETCH & UPDATE USER SUBSCRIPTION STATUS
+            // STEP 4 — UPDATE USER SUBSCRIPTION STATUS FROM IPN RESPONSE
             // =====================================================
-            const fetchUpdatedUserInfoWithRetry = async (retries = 3, delay = 1000) => {
-              for (let i = 0; i < retries; i++) {
-                try {
-                  // Add delay before each attempt (give backend time to process)
-                  await new Promise(resolve => setTimeout(resolve, delay));
-                  
-                  let updatedData = null;
-                  
-                  // Try to get subscription status first (new endpoint)
-                  try {
-                    const subscription = await getSubscriptionStatus();
-                    console.log("Got subscription status:", subscription);
-                    if (subscription && subscription.plan) {
-                      updatedData = subscription;
-                    }
-                  } catch (subError) {
-                    console.warn("Subscription status endpoint failed, trying profile endpoint:", subError);
-                    // Fallback to profile endpoint
-                    try {
-                      const profile = await getProfile();
-                      console.log("Got profile:", profile);
-                      if (profile && profile.plan) {
-                        updatedData = profile;
-                      }
-                    } catch (profileError) {
-                      console.warn("Profile endpoint also failed:", profileError);
-                    }
-                  }
-                  
-                  // Update user info if we got new data with plan
-                  if (updatedData && updatedData.plan) {
-                    const currentUser = getUserInfo();
-                    if (currentUser) {
-                      setUserInfo({
-                        ...currentUser,
-                        plan: updatedData.plan,
-                      });
-                      console.log("User info updated with new plan:", updatedData.plan);
-                      return true;
-                    }
-                  }
-                } catch (error) {
-                  console.warn(`User info fetch attempt ${i + 1} failed:`, error);
-                }
+            
+            // Check if IPN response contains plan info
+            const currentUser = getUserInfo();
+            if (currentUser) {
+              let planToSet = null;
+              
+              // First, try to get plan from IPN response
+              if (response && (response.plan || response.planCode)) {
+                planToSet = response.plan || response.planCode;
+                console.log("✓ Got plan from IPN response:", planToSet);
               }
               
-              // Even if all retries failed, payment is confirmed, so we can proceed
-              console.warn("Failed to fetch updated user info after all retries, but payment is confirmed");
-              return false;
-            };
-
-            // Try to fetch updated user info, but don't block if it fails
-            // Payment is already confirmed by IPN, so we proceed regardless
-            await fetchUpdatedUserInfoWithRetry();
+              // Fallback to packageType from localStorage
+              if (!planToSet) {
+                const packageType = localStorage.getItem("pendingPackageType") as string | null;
+                if (packageType === "PRO_MONTH") {
+                  planToSet = "PRO_MONTH";
+                } else if (packageType === "PRO_YEAR") {
+                  planToSet = "PRO_YEAR";
+                } else {
+                  planToSet = "PRO"; // Generic fallback
+                }
+                console.log("⚠ Using fallback plan from localStorage:", planToSet);
+              }
+              
+              // Update user info with new plan
+              setUserInfo({
+                ...currentUser,
+                plan: planToSet,
+              });
+              console.log("✓ User info updated with plan:", planToSet);
+              
+              // Clean up
+              localStorage.removeItem("pendingPackageType");
+            }
 
             // Redirect to dashboard after 2 seconds
             // (Don't reload page to avoid calling handleVNPayIPN again)

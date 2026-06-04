@@ -32,6 +32,10 @@ export function Upgrade() {
     setError(null);
 
     try {
+      // Store packageType in localStorage for PaymentReturn to use
+      localStorage.setItem("pendingPackageType", packageType);
+      console.log("Stored pending package type:", packageType);
+      
       const response = await initiatePayment(packageType);
       
       if (response.paymentUrl) {
@@ -39,11 +43,13 @@ export function Upgrade() {
         redirectToVNPay(response.paymentUrl);
       } else {
         setError("Không thể khởi tạo thanh toán. Vui lòng thử lại.");
+        localStorage.removeItem("pendingPackageType");
       }
     } catch (err) {
       console.error("Payment initiation error:", err);
       setError(err instanceof Error ? err.message : "Có lỗi xảy ra. Vui lòng thử lại.");
       setIsLoading(false);
+      localStorage.removeItem("pendingPackageType");
     }
   };
 
