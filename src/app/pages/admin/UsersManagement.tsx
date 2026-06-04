@@ -391,9 +391,9 @@ export function UsersManagement() {
                     <th className="text-left px-6 py-4 text-xs font-semibold" style={{ color: "#6B7280" }}>
                       DỊCH THUẬT
                     </th> */}
-                    <th className="text-left px-6 py-4 text-xs font-semibold" style={{ color: "#6B7280" }}>
+                    {/* <th className="text-left px-6 py-4 text-xs font-semibold" style={{ color: "#6B7280" }}>
                       HÀNH ĐỘNG
-                    </th>
+                    </th> */}
                   </tr>
                 </thead>
                 <tbody>
@@ -466,7 +466,7 @@ export function UsersManagement() {
                             {user.status}
                           </span>
                         </td>
-                        <td className="px-6 py-4">
+                        {/* <td className="px-6 py-4">
                           <div className="flex items-center gap-2">
                             <button
                               className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50"
@@ -495,7 +495,7 @@ export function UsersManagement() {
                               <Trash2 size={16} style={{ color: "#DC2626" }} />
                             </button>
                           </div>
-                        </td>
+                        </td> */}
                       </tr>
                     ))
                   ) : (

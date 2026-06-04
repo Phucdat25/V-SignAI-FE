@@ -307,7 +307,7 @@ export function Landing() {
                 </div>
               </div>
               <button
-                onClick={() => navigate("/dashboard")}
+                onClick={() => navigate("/login")}
                 className="w-full py-3.5 rounded-2xl transition-all hover:bg-blue-50"
                 style={{ border: "2px solid #2563EB", color: "#2563EB", fontWeight: 700, fontSize: 15 }}
               >
@@ -337,7 +337,7 @@ export function Landing() {
                 </div>
               </div>
               <button
-                onClick={() => navigate("/upgrade")}
+                onClick={() => navigate("/login")}
                 className="w-full py-3.5 rounded-2xl font-bold transition-all hover:opacity-90"
                 style={{ backgroundColor: "white", color: "#2563EB", fontSize: 15 }}
               >
@@ -364,7 +364,7 @@ export function Landing() {
                 </div>
               </div>
               <button
-                onClick={() => navigate("/upgrade")}
+                onClick={() => navigate("/login")}
                 className="w-full py-3.5 rounded-2xl font-bold transition-all hover:opacity-90"
                 style={{ backgroundColor: "white", color: "#2563EB", fontSize: 15 }}
               >
