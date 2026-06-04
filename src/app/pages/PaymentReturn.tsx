@@ -47,18 +47,33 @@ export function PaymentReturn() {
             // =====================================================
             // STEP 4 — FETCH & UPDATE USER PROFILE
             // =====================================================
-            try {
-              const updatedProfile = await getProfile();
-              console.log("Updated user profile after payment:", updatedProfile);
-              setUserInfo(updatedProfile);
-            } catch (profileError) {
-              console.warn("Failed to refresh user profile, but proceeding with redirect:", profileError);
-            }
+            const fetchProfileWithRetry = async (retries = 3, delay = 1000) => {
+              for (let i = 0; i < retries; i++) {
+                try {
+                  // Add delay before each attempt (give backend time to process)
+                  await new Promise(resolve => setTimeout(resolve, delay));
+                  
+                  const updatedProfile = await getProfile();
+                  console.log("Updated user profile after payment:", updatedProfile);
+                  setUserInfo(updatedProfile);
+                  return true; // Success
+                } catch (error) {
+                  console.warn(`Profile fetch attempt ${i + 1} failed:`, error);
+                  if (i === retries - 1) {
+                    console.warn("Failed to refresh user profile after all retries, but proceeding with redirect");
+                    return false;
+                  }
+                }
+              }
+            };
 
-            // Redirect to dashboard after 3 seconds
+            await fetchProfileWithRetry();
+
+            // Reload page to ensure all components refresh with updated user info and subscription status
+            console.log("Payment successful, reloading page to update user info...");
             setTimeout(() => {
-              navigate("/dashboard");
-            }, 3000);
+              window.location.reload();
+            }, 2000);
           } else {
             // Payment processed but server returned error
             setStatus("error");
