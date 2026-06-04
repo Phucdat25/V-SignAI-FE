@@ -32,15 +32,40 @@ export function PaymentReturn() {
         // STEP 2 — CALL IPN ENDPOINT TO VERIFY PAYMENT
         // =====================================================
 
-        const response = await handleVNPayIPN(params);
+        let response: any = null;
+        let isConfirmed = false;
+
+        try {
+          response = await handleVNPayIPN(params);
+          isConfirmed = response.RspCode === "00";
+          
+          // Also check if response message indicates already confirmed
+          if (!isConfirmed && response.Message?.toLowerCase().includes("already confirmed")) {
+            console.log("Payment was already confirmed in a previous request");
+            isConfirmed = true;
+          }
+        } catch (ipnError: any) {
+          // Check if error is due to payment already being confirmed
+          const errorMsg = ipnError?.message || JSON.stringify(ipnError);
+          console.warn("IPN verification error:", errorMsg);
+          
+          if (errorMsg.toLowerCase().includes("already confirmed") || 
+              errorMsg.toLowerCase().includes("payment already confirmed")) {
+            // Payment was already confirmed in a previous request - this is success!
+            isConfirmed = true;
+            response = { RspCode: "00", Message: "Payment already confirmed" };
+          } else {
+            throw ipnError; // Re-throw if it's not the "already confirmed" error
+          }
+        }
 
         // =====================================================
         // STEP 3 — HANDLE RESPONSE
         // =====================================================
 
         if (isPaymentSuccess(params.vnp_ResponseCode)) {
-          if (response.RspCode === "00") {
-            // Payment confirmed successfully
+          if (isConfirmed) {
+            // Payment confirmed successfully (or was already confirmed)
             setStatus("success");
             setMessage("Thanh toán thành công! Gói Premium của bạn đã được kích hoạt.");
 
@@ -69,10 +94,11 @@ export function PaymentReturn() {
 
             await fetchProfileWithRetry();
 
-            // Reload page to ensure all components refresh with updated user info and subscription status
-            console.log("Payment successful, reloading page to update user info...");
+            // Redirect to dashboard after 2 seconds
+            // (Don't reload page to avoid calling handleVNPayIPN again)
+            console.log("Payment successful, redirecting to dashboard...");
             setTimeout(() => {
-              window.location.reload();
+              navigate("/dashboard");
             }, 2000);
           } else {
             // Payment processed but server returned error
