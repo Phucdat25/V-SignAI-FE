@@ -3,7 +3,8 @@ import { useEffect, useState } from "react";
 import { Navbar } from "../components/Navbar";
 import { RecentConversations } from "../components/RecentConversations";
 import { MessageSquare, BookOpen, History, Zap, Mic, TrendingUp, Bell } from "lucide-react";
-import { getUserInfo, getTodayUsage, getAuthToken } from "../api";
+import { getUserInfo, getTodayUsage, getAuthToken, setUserInfo } from "../api";
+import { getProfile } from "../api/example";
 
 export function Dashboard() {
   const navigate = useNavigate();
@@ -24,6 +25,25 @@ export function Dashboard() {
     } else {
       console.warn("Dashboard - No user info found in localStorage");
     }
+
+    // Refresh user info from backend to ensure plan is up-to-date
+    const refreshUserInfo = async () => {
+      try {
+        console.log("Dashboard - Refreshing user info from backend...");
+        const updatedProfile = await getProfile();
+        console.log("Dashboard - Updated profile from backend:", updatedProfile);
+        setUserInfo(updatedProfile);
+        
+        // Update local state with refreshed data
+        if (updatedProfile.plan) {
+          setUserPlan(updatedProfile.plan);
+          console.log("Dashboard - Updated plan to:", updatedProfile.plan);
+        }
+      } catch (error) {
+        console.warn("Dashboard - Failed to refresh user info from backend:", error);
+        // Continue with local data if refresh fails
+      }
+    };
 
     // Fetch usage data
     const fetchUsage = async () => {
@@ -58,7 +78,13 @@ export function Dashboard() {
       }
     };
 
-    fetchUsage();
+    // Call refresh and fetch usage after a short delay to ensure component is mounted
+    const timeout = setTimeout(() => {
+      refreshUserInfo();
+      fetchUsage();
+    }, 100);
+
+    return () => clearTimeout(timeout);
   }, []);
 
   return (
