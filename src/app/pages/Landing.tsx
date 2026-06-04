@@ -385,35 +385,45 @@ export function Landing() {
             />
           <span style={{ color: "white", fontWeight: 700, fontSize: 18 }}>V-Sign AI</span>
         </div>
-        <p style={{ color: "#9CA3AF", fontSize: 14, marginBottom: 12 }}>© 2026 V-Sign AI. Hỗ trợ cộng đồng người khiếm thính tại Việt Nam </p>
-        
-        {/* Social Media Links */}
-        <div className="flex items-center justify-center gap-4">
-          <a
-            href="https://facebook.com/vsignai"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="w-10 h-10 rounded-full flex items-center justify-center transition-all hover:scale-110 hover:opacity-80"
-            style={{ backgroundColor: "#2563EB" }}
-            title="Theo dõi Facebook"
-          >
-            <Facebook size={20} color="white" />
-          </a>
-          
-          <a
-            href="https://www.tiktok.com/@vsign.ai4?_r=1&_t=ZS-96em2U4Yr9M"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="w-10 h-10 rounded-full flex items-center justify-center transition-all hover:scale-110 hover:opacity-80"
-            style={{ backgroundColor: "#000000" }}
-            title="Theo dõi TikTok"
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" style={{ color: "white" }}>
-              <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.68v13.7a2.4 2.4 0 0 1-2.54 2.4H9.4a2.4 2.4 0 0 1-2.54-2.4 2.4 2.4 0 0 1 2.54-2.4h.09v-3.66a5.85 5.85 0 0 0-5.85 5.82 5.85 5.85 0 0 0 5.85 5.85 5.81 5.81 0 0 0 5.85-5.85V8.54a7.81 7.81 0 0 0 3.77 1.04v-3.7a4.83 4.83 0 0 1-.26-.15Z"/>
-            </svg>
-          </a>
-        </div>
+        <p style={{ color: "#9CA3AF", fontSize: 14 }}>© 2026 V-Sign AI. Hỗ trợ cộng đồng người khiếm thính tại Việt Nam </p>
       </footer>
+
+      {/* Floating Social Media Buttons */}
+      <div
+        style={{
+          position: "fixed",
+          right: 20,
+          bottom: 80,
+          display: "flex",
+          flexDirection: "column",
+          gap: 16,
+          zIndex: 40,
+        }}
+      >
+        <a
+          href="https://www.facebook.com/profile.php?id=61590209076629"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="w-14 h-14 rounded-full flex items-center justify-center transition-all hover:scale-110 shadow-lg"
+          style={{ backgroundColor: "#2563EB" }}
+          title="Theo dõi Facebook"
+        >
+          <Facebook size={24} color="white" />
+        </a>
+        
+        <a
+          href="https://www.tiktok.com/@vsign.ai4?_r=1&_t=ZS-96em2U4Yr9M"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="w-14 h-14 rounded-full flex items-center justify-center transition-all hover:scale-110 shadow-lg"
+          style={{ backgroundColor: "#000000" }}
+          title="Theo dõi TikTok"
+        >
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" style={{ color: "white" }}>
+            <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.68v13.7a2.4 2.4 0 0 1-2.54 2.4H9.4a2.4 2.4 0 0 1-2.54-2.4 2.4 2.4 0 0 1 2.54-2.4h.09v-3.66a5.85 5.85 0 0 0-5.85 5.82 5.85 5.85 0 0 0 5.85 5.85 5.81 5.81 0 0 0 5.85-5.85V8.54a7.81 7.81 0 0 0 3.77 1.04v-3.7a4.83 4.83 0 0 1-.26-.15Z"/>
+          </svg>
+        </a>
+      </div>
     </div>
   );
 }
