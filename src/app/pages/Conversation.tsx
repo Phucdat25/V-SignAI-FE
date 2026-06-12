@@ -4,6 +4,7 @@ import { RecentConversations } from "../components/RecentConversations";
 import { get, post } from "../api/client";
 import { ApiError } from "../api";
 import { Mic, MicOff, Volume2, Camera, CameraOff, Hand, Send, RotateCcw, User, MessageSquare } from "lucide-react";
+import { Holistic } from '@mediapipe/holistic';
 
 const QUICK_PHRASES = [
   "Xin chào",
@@ -13,6 +14,13 @@ const QUICK_PHRASES = [
   "Tôi cần giúp đỡ",
 ];
 
+const DEMO_SPEECH = [
+  "Xin chào",
+  "Xin lỗi",
+  "Tôi không hiểu",
+  "Nói chậm hơn được không?",
+  "Tôi cần giúp đỡ",
+];
 
 const DEMO_SIGN_TEXT = [
   "Tôi cần giúp đỡ",
@@ -52,6 +60,11 @@ export function Conversation() {
   const [isCheckingUsage, setIsCheckingUsage] = useState(false);
   const [finalSentence, setFinalSentence] = useState("");
 
+  // Risk reduction UI states
+  const [handDetected, setHandDetected] = useState(false);
+  const [hasGoodLighting, setHasGoodLighting] = useState(false);
+  const [movementWithinThreshold, setMovementWithinThreshold] = useState(true);
+
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const audioStreamRef = useRef<MediaStream | null>(null);
@@ -60,10 +73,21 @@ export function Conversation() {
   const recordingStartTimeRef = useRef<number | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
+  const handLandmarksRef = useRef<any>(null);
+  const mediaPipeRef = useRef<any>(null);
+  const analysisCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
   const startCamera = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          frameRate: { ideal: 30 },
+          facingMode: "user"
+        },
+        audio: false
+      });
       mediaStreamRef.current = stream;
       setCameraError("");
       setIsCameraActive(true);
@@ -88,7 +112,7 @@ export function Conversation() {
           const elapsed = Math.round((Date.now() - recordingStartTimeRef.current) / 1000);
           setRecordingTime(elapsed);
         }
-      }, 100);
+      }, 500);
     } catch (error) {
       console.error("Lỗi mở camera:", error);
       setCameraError("Không thể mở camera. Vui lòng kiểm tra quyền truy cập camera trên trình duyệt.");
@@ -105,6 +129,94 @@ export function Conversation() {
           console.warn("Lỗi phát video:", playError);
         }
       });
+
+      // Initialize MediaPipe Holistic
+      if (!mediaPipeRef.current) {
+        const holistic = new Holistic({
+          locateFile: (file) =>
+            `https://cdn.jsdelivr.net/npm/@mediapipe/holistic/${file}`,
+        });
+
+        holistic.setOptions({
+          modelComplexity: 1,
+          smoothLandmarks: true,
+          minDetectionConfidence: 0.5,
+          minTrackingConfidence: 0.5,
+        });
+
+        holistic.onResults((results: any) => {
+          const hasHands = !!results.leftHandLandmarks || !!results.rightHandLandmarks;
+          setHandDetected(hasHands);
+
+          // Calculate brightness from current frame
+          if (videoRef.current && videoRef.current.readyState === videoRef.current.HAVE_ENOUGH_DATA) {
+            // Initialize canvas once if not already created
+            if (!analysisCanvasRef.current) {
+              analysisCanvasRef.current = document.createElement('canvas');
+            }
+
+            const canvas = analysisCanvasRef.current;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+              canvas.width = videoRef.current.videoWidth;
+              canvas.height = videoRef.current.videoHeight;
+              ctx.drawImage(videoRef.current, 0, 0);
+              
+              const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+              const data = imageData.data;
+              let brightnessSum = 0;
+              const totalPixels = data.length / 4;
+              
+              for (let i = 0; i < data.length; i += 4) {
+                const r = data[i];
+                const g = data[i + 1];
+                const b = data[i + 2];
+                brightnessSum += (r + g + b) / 3;
+              }
+              
+              const brightness = brightnessSum / totalPixels;
+              setHasGoodLighting(brightness > 60);
+            }
+          }
+
+          // Calculate hand movement speed
+          if (hasHands && handLandmarksRef.current) {
+            const currentLandmarks = results.leftHandLandmarks || results.rightHandLandmarks;
+            const previousLandmarks = handLandmarksRef.current;
+            
+            if (currentLandmarks && previousLandmarks) {
+              let totalMovement = 0;
+              for (let i = 0; i < Math.min(currentLandmarks.length, previousLandmarks.length); i++) {
+                const dx = currentLandmarks[i].x - previousLandmarks[i].x;
+                const dy = currentLandmarks[i].y - previousLandmarks[i].y;
+                totalMovement += Math.sqrt(dx * dx + dy * dy);
+              }
+              
+              const avgMovement = totalMovement / currentLandmarks.length;
+              setMovementWithinThreshold(avgMovement < 0.15);
+            }
+          }
+          
+          if (hasHands) {
+            handLandmarksRef.current = results.leftHandLandmarks || results.rightHandLandmarks;
+          }
+        });
+
+        mediaPipeRef.current = holistic;
+      }
+
+      // Process video frames
+      const processFrameInterval = setInterval(async () => {
+        if (videoRef.current && mediaPipeRef.current && videoRef.current.readyState === videoRef.current.HAVE_ENOUGH_DATA) {
+          try {
+            await mediaPipeRef.current.send({ image: videoRef.current });
+          } catch (error) {
+            console.warn("Holistic processing error:", error);
+          }
+        }
+      }, 500);
+      
+      return () => clearInterval(processFrameInterval);
     }
   }, [isCameraActive]);
 
@@ -128,6 +240,23 @@ export function Conversation() {
       videoRef.current.srcObject = null;
     }
     setIsCameraActive(false);
+    
+    // Close Holistic and reset state
+    if (mediaPipeRef.current) {
+      try {
+        mediaPipeRef.current.close();
+      } catch (error) {
+        console.warn("Error closing Holistic:", error);
+      }
+      mediaPipeRef.current = null;
+    }
+    
+    // Reset condition checks
+    setHandDetected(false);
+    setHasGoodLighting(false);
+    setMovementWithinThreshold(true);
+    handLandmarksRef.current = null;
+    analysisCanvasRef.current = null;
   };
 
   const toggleCamera = async () => {
@@ -504,17 +633,13 @@ export function Conversation() {
           recognitionRef.current.stop();
         } catch {}
       }
+      if (mediaPipeRef.current) {
+        try {
+          mediaPipeRef.current.close();
+        } catch {}
+      }
     };
   }, []);
-
-  useEffect(() => {
-    if (isCameraActive && videoRef.current && mediaStreamRef.current) {
-      videoRef.current.srcObject = mediaStreamRef.current;
-      videoRef.current.play().catch((playError) => {
-        console.warn("Không thể tự động phát video camera:", playError);
-      });
-    }
-  }, [isCameraActive]);
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: "#f1f5f9" }}>
@@ -775,6 +900,79 @@ export function Conversation() {
                 </div>
               )}
             </div>
+
+            {/* Risk Reduction - Pre-Detection Checks (Warnings Only) */}
+            {isCameraActive && (
+              <div className="mb-4 rounded-2xl p-4" style={{ backgroundColor: "#F9FAFB", border: "2px solid #E5E7EB" }}>
+                <p style={{ fontSize: 11, fontWeight: 700, color: "#6B7280", marginBottom: 8, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                  📋 Gợi ý tối ưu hóa
+                </p>
+                
+                <div className="space-y-2">
+                  {/* Hand Detection */}
+                  <div className="flex items-center gap-3">
+                    <div 
+                      className="w-5 h-5 rounded-full flex items-center justify-center"
+                      style={{ backgroundColor: handDetected ? "#16A34A" : "#FBBF24" }}
+                    >
+                      {handDetected ? (
+                        <span style={{ color: "white", fontSize: 12, fontWeight: 700 }}>✓</span>
+                      ) : (
+                        <span style={{ color: "white", fontSize: 12, fontWeight: 700 }}>!</span>
+                      )}
+                    </div>
+                    <span style={{ fontSize: 13, color: handDetected ? "#16A34A" : "#B45309", fontWeight: 600 }}>
+                      Đưa tay vào khung hình
+                    </span>
+                  </div>
+
+                  {/* Lighting */}
+                  <div className="flex items-center gap-3">
+                    <div 
+                      className="w-5 h-5 rounded-full flex items-center justify-center"
+                      style={{ backgroundColor: hasGoodLighting ? "#16A34A" : "#FBBF24" }}
+                    >
+                      {hasGoodLighting ? (
+                        <span style={{ color: "white", fontSize: 12, fontWeight: 700 }}>✓</span>
+                      ) : (
+                        <span style={{ color: "white", fontSize: 12, fontWeight: 700 }}>!</span>
+                      )}
+                    </div>
+                    <span style={{ fontSize: 13, color: hasGoodLighting ? "#16A34A" : "#B45309", fontWeight: 600 }}>
+                      Giữ đủ sáng
+                    </span>
+                  </div>
+
+                  {/* Movement Speed */}
+                  <div className="flex items-center gap-3">
+                    <div 
+                      className="w-5 h-5 rounded-full flex items-center justify-center"
+                      style={{ backgroundColor: movementWithinThreshold ? "#16A34A" : "#FBBF24" }}
+                    >
+                      {movementWithinThreshold ? (
+                        <span style={{ color: "white", fontSize: 12, fontWeight: 700 }}>✓</span>
+                      ) : (
+                        <span style={{ color: "white", fontSize: 12, fontWeight: 700 }}>!</span>
+                      )}
+                    </div>
+                    <span style={{ fontSize: 13, color: movementWithinThreshold ? "#16A34A" : "#B45309", fontWeight: 600 }}>
+                      Di chuyển chậm hơn
+                    </span>
+                  </div>
+                </div>
+
+                {(!handDetected || !hasGoodLighting || !movementWithinThreshold) && (
+                  <div className="mt-3 p-3 rounded-lg" style={{ backgroundColor: "#FEF3C7", border: "1px solid #FDE68A" }}>
+                    <p style={{ fontSize: 12, color: "#92400E", fontWeight: 500 }}>
+                      💡 {!handDetected ? "Không phát hiện bàn tay rõ - " : ""}
+                      {!hasGoodLighting ? "Cần thêm ánh sáng - " : ""}
+                      {!movementWithinThreshold ? "Giảm tốc độ chuyển động" : ""}
+                      Có thể ảnh hưởng đến độ chính xác
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Camera Controls */}
             <div className="grid grid-cols-2 gap-3 mb-4">
