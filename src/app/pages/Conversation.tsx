@@ -58,7 +58,7 @@ export function Conversation() {
   const [recordingTime, setRecordingTime] = useState(0);
   const [availableTime, setAvailableTime] = useState<number | null>(null);
   const [isCheckingUsage, setIsCheckingUsage] = useState(false);
-  const [finalSentence, setFinalSentence] = useState("");
+  const [predictedGloss, setPredictedGloss] = useState("");
 
   // Risk reduction UI states
   const [handDetected, setHandDetected] = useState(false);
@@ -264,7 +264,7 @@ export function Conversation() {
       stopCamera();
       setDetectedSignText("");
       setEditableText("");
-      setFinalSentence("");
+      setPredictedGloss("");
     } else {
       // Check usage quota before opening camera
       setIsCheckingUsage(true);
@@ -501,16 +501,16 @@ export function Conversation() {
       const result = await response.json();
       console.log("[startDetection] response:", result);
 
-      // Extract finalSentence from response - try multiple key paths
-      const finalSentence = result?.data?.final_sentence || result?.data?.finalSentence || result?.finalSentence || result?.final_sentence || result?.sentence || "";
+      // Extract predictedGloss from response - try multiple key paths
+      const predictedGloss = result?.data?.predicted_gloss || result?.data?.predictedGloss || result?.predictedGloss || result?.predicted_gloss || result?.predicted || "";
       
-      if (!finalSentence) {
+      if (!predictedGloss) {
         throw new Error("API không trả về kết quả nhận dạng. Vui lòng thử lại.");
       }
       
-      setFinalSentence(finalSentence);
-      setDetectedSignText(finalSentence);
-      setEditableText(finalSentence);
+      setPredictedGloss(predictedGloss);
+      setDetectedSignText(predictedGloss);
+      setEditableText(predictedGloss);
       refreshRecentHistory();
     } catch (error) {
       console.error("Lỗi API predict:", error);
@@ -521,7 +521,7 @@ export function Conversation() {
       );
       setDetectedSignText("");
       setEditableText("");
-      setFinalSentence("");
+      setPredictedGloss("");
     } finally {
       setIsDetecting(false);
       // Dọn dẹp nếu camera vẫn còn bật (lỗi trước khi tắt preview)
@@ -1033,13 +1033,13 @@ export function Conversation() {
             )}
 
             {/* Detection Output */}
-            {finalSentence && (
+            {predictedGloss && (
               <div className="mb-4 rounded-2xl p-4" style={{ backgroundColor: "#F0FDF4", border: "2px solid #BBF7D0" }}>
                 <p style={{ fontSize: 11, fontWeight: 600, color: "#16A34A", marginBottom: 4, textTransform: "uppercase" }}>
                   ✨ Câu hoàn chỉnh:
                 </p>
                 <p style={{ fontSize: 16, fontWeight: 700, color: "#059669" }}>
-                  {finalSentence}
+                  {predictedGloss}
                 </p>
               </div>
             )}
